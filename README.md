@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ PiX Agent
+<img src="assets/pix-hero.png" alt="PiX Agent autonomous coding runtime visual hero" width="1240">
 
 **A Minimal, Extensible & Visual Autonomous Coding Agent Runtime**
 
@@ -17,9 +17,19 @@ not a chat API wrapper.**
 ![Tests](https://img.shields.io/badge/tests-passing-34d399)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+<p align="center">
+  <a href="#showcase">Live Demo</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#cli">CLI</a> ·
+  <a href="#technical-deep-dive">Docs</a>
+</p>
+
 </div>
 
-| **Autonomous Coding** | **Repository Retrieval** | **Tool Calling** | **Test → Failure → Repair → Success** |
+## Showcase
+
+| **01 · Autonomous Coding** | **02 · Repository Retrieval** | **03 · Tool Calling** | **04 · Failure → Repair → Success** |
 | --- | --- | --- | --- |
 | Plans, calls tools, verifies failures and commits the repaired change in one bounded agent loop. | Indexes and searches the target repo before acting, so fixes start from real code rather than guesses. | Sandboxed read/write/search/shell/git tools with MCP extension points. | Runs the detected test command, feeds failed output back to the agent, then reruns until green. |
 

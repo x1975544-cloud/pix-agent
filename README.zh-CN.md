@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ PiX Agent
+<img src="assets/pix-hero.png" alt="PiX Agent 自主编码 Runtime 视觉 Hero" width="1240">
 
 **A Minimal, Extensible & Visual Autonomous Coding Agent Runtime**
 
@@ -17,9 +17,19 @@
 ![Tests](https://img.shields.io/badge/tests-passing-34d399)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+<p align="center">
+  <a href="#showcase">Showcase</a> ·
+  <a href="#architecture">架构</a> ·
+  <a href="#quick-start">快速开始</a> ·
+  <a href="#cli">CLI</a> ·
+  <a href="#technical-deep-dive">文档</a>
+</p>
+
 </div>
 
-| **Autonomous Coding** | **Repository Retrieval** | **Tool Calling** | **Test → Failure → Repair → Success** |
+## Showcase
+
+| **01 · Autonomous Coding** | **02 · Repository Retrieval** | **03 · Tool Calling** | **04 · Failure → Repair → Success** |
 | --- | --- | --- | --- |
 | 在同一个有边界的 Agent Loop 中完成规划、工具调用、失败验证、修复并提交变更。 | 在执行前索引并检索目标仓库，让修复从真实代码出发，而不是靠猜测。 | 沙箱化的 read/write/search/shell/git 工具，并提供 MCP 扩展点。 | 执行检测到的测试命令，把失败输出回传给 Agent 修复，然后重跑直到通过。 |
 
