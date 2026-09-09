@@ -27,7 +27,7 @@ not a chat API wrapper.**
 
 </div>
 
-## Showcase
+## ✨ Showcase
 
 | **01 · Autonomous Coding** | **02 · Repository Retrieval** | **03 · Tool Calling** | **04 · Failure → Repair → Success** |
 | --- | --- | --- | --- |
@@ -55,7 +55,7 @@ not a chat API wrapper.**
 
 ---
 
-## Why PiX?
+## 💡 Why PiX?
 
 - No LangChain or LangGraph dependency inside the core runtime.
 - One provider-neutral interface with an OpenAI Responses implementation and
@@ -69,7 +69,7 @@ not a chat API wrapper.**
 - A CLI, FastAPI and Next.js dashboard around the same runtime.
 - Honest evaluation: benchmark reports only come from actual runs.
 
-## Demo
+## 🎬 Demo
 
 The repository includes a small FastAPI demo project with an intentional
 FizzBuzz bug. The demo creates a disposable Git workspace, enables offline
@@ -121,13 +121,13 @@ GIF-friendly snapshot under `.demo/autonomous-coding-dashboard.json`:
 uv run python -m pix.coding_demo --print-json
 ```
 
-## Architecture
+## 🏗️ Architecture
 
 <p align="center">
   <img src="assets/pix-architecture.png" alt="PiX architecture from user task through PiX Agent, repository retrieval, tool calling, verification, autonomous repair, Git commit and dashboard trace" width="1240">
 </p>
 
-## Agent Loop
+## 🔁 Agent Loop
 
 ```text
 while not finished:
@@ -145,7 +145,7 @@ The loop supports max iterations, provider retries, tool timeouts, cancellation
 and safe error recovery. A bounded fix loop feeds failed verification output
 back to the model.
 
-## Features
+## 🧩 Features
 
 - **Tool Registry**: one `Tool` contract for local and MCP tools.
 - **Filesystem sandbox**: traversal-proof workspace paths, UTF-8 preference,
@@ -167,7 +167,7 @@ back to the model.
 - **MCP**: stdio JSON-RPC client, tool adapter and registry for external tools.
 - **Evaluation**: JSON benchmark tasks, validation rules and report generation.
 
-## Tool System
+## 🔧 Tool System
 
 | Tool | Description |
 | --- | --- |
@@ -182,7 +182,7 @@ back to the model.
 | `git_branch` | Current and available branches |
 | `git_commit` | Stage and commit with a message |
 
-## Context Engineering
+## 🧾 Context Engineering
 
 Content is ordered by priority:
 
@@ -195,7 +195,7 @@ The context manager estimates tokens, enforces a budget and marks truncation.
 When the history no longer fits, `ContextCompressor` summarizes older messages
 into compact facts while preserving the current task and the newest tool state.
 
-## Memory
+## 🧠 Memory
 
 - `ShortTermMemory` keeps live session facts.
 - `LongTermMemory` persists across sessions in SQLite.
@@ -208,7 +208,7 @@ ChromaDB and embedding providers are optional (`uv sync --extra memory`). When
 they are not installed, recall uses SQLite keyword search instead of pretending
 semantic retrieval exists.
 
-## MCP
+## 🔌 MCP
 
 `StdioMCPClient` speaks JSON-RPC over stdin/stdout. `MCPToolAdapter` wraps a
 remote tool as a local `Tool`, and `MCPRegistry` attaches adapters under names
@@ -219,14 +219,14 @@ PIX_ENABLE_MCP=true
 PIX_MCP_SERVERS=["filesystem|npx -y @modelcontextprotocol/server-filesystem ./"]
 ```
 
-## Verification
+## 🧪 Verification
 
 The repository analyzer detects the most likely test command from project
 manifests. After a coding run, the executor runs that command and records the
 real result. Failed output is returned to the model for bounded fix attempts;
 there is no simulated success state.
 
-## Observability
+## 📡 Observability
 
 Events include session start, repository analysis, plan creation, context
 builds, LLM requests/responses, tool calls/results, verification and errors.
@@ -234,7 +234,7 @@ Every event is redacted before persistence. `Usage` records input/output/total
 tokens when the provider returns them and leaves cost `None` when pricing is
 unknown.
 
-## Quick Start
+## 🚀 Quick Start
 
 Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/) and an OpenAI API
 key.
@@ -261,7 +261,7 @@ Run against another workspace:
 uv run pix run --workspace ./examples/demo-project "Fix the failing FizzBuzz test"
 ```
 
-## CLI
+## ⌨️ CLI
 
 ```bash
 uv run pix run "Fix the failing tests"
@@ -276,7 +276,7 @@ uv run pix serve
 
 The CLI uses Rich panels, status colors and formatted tables.
 
-## Web Dashboard
+## 🖥️ Web Dashboard
 
 Start the API and the Next.js app in separate terminals:
 
@@ -292,7 +292,7 @@ from the FastAPI backend, with views for Agent Run, Autonomous Coding Demo,
 Sessions, Trace, Tools, Benchmark and Settings. The demo view can replay a
 persisted deterministic snapshot or start a fresh scripted run from the UI.
 
-## Project Structure
+## 🗂️ Project Structure
 
 ```text
 pix/                  Python runtime
@@ -314,7 +314,7 @@ benchmarks/           JSON tasks and reports
 docs/                 architecture and design documents
 ```
 
-## Technical Deep Dive
+## 📚 Technical Deep Dive
 
 - [Architecture](docs/architecture.md)
 - [Agent Loop](docs/agent-loop.md)
@@ -326,7 +326,7 @@ docs/                 architecture and design documents
 - [Security](docs/security.md)
 - [Benchmark](docs/benchmark.md)
 
-## Development
+## 🛠️ Development
 
 ```bash
 uv sync --extra dev
@@ -339,7 +339,7 @@ uv run pytest
 All tests run with the standard `pytest` command. Integration tests use a
 scripted local provider and do not require network access.
 
-## Docker
+## 🐳 Docker
 
 ```bash
 cp .env.example .env
@@ -349,7 +349,7 @@ docker compose up --build
 The API listens on `http://localhost:8000` and the dashboard on
 `http://localhost:3000`.
 
-## Benchmark
+## 📊 Benchmark
 
 Benchmark task definitions are JSON files under `benchmarks/tasks`. No verified
 tasks are shipped with v1.0 yet, so the runner reports no published result
@@ -364,7 +364,7 @@ Reports are written to `benchmarks/results/`. Until a real run is executed,
 the project states that benchmark data is experimental and unpublished rather
 than shipping fabricated numbers.
 
-## Roadmap
+## 🗺️ Roadmap
 
 - Anthropic, Gemini and Ollama provider implementations
 - Multi-agent state machine with Planner / Coder / Tester / Reviewer roles
@@ -372,12 +372,12 @@ than shipping fabricated numbers.
 - Publish CI badges from real GitHub/Gitee Actions runs
 - Expand benchmark tasks with verified repositories
 
-## Contributing
+## 🤝 Contributing
 
 Keep the core runtime framework-free, add tests for every boundary, and keep
 README/docs synchronized with code. Do not ship fake demo traces or benchmark
 numbers.
 
-## License
+## 📄 License
 
 [MIT](LICENSE)

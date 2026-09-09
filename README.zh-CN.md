@@ -27,7 +27,7 @@
 
 </div>
 
-## Showcase
+## ✨ Showcase
 
 | **01 · Autonomous Coding** | **02 · Repository Retrieval** | **03 · Tool Calling** | **04 · Failure → Repair → Success** |
 | --- | --- | --- | --- |
@@ -55,7 +55,7 @@
 
 ---
 
-## 为什么选择 PiX
+## 💡 为什么选择 PiX
 
 - 核心 Agent Runtime 不依赖 LangChain / LangGraph。
 - 统一 Provider 抽象，内置 OpenAI Responses API 实现，并预留 Anthropic、
@@ -68,7 +68,7 @@
 - CLI、FastAPI、Next.js Dashboard 都围绕同一个 Runtime 构建。
 - 诚实评估：Benchmark 数据只来自真实运行，不预置伪造结果。
 
-## Demo
+## 🎬 Demo
 
 仓库内置一个小型 FastAPI Demo 工程，其中有一个故意的 FizzBuzz bug。脚本会创建
 独立的 Git 工作区、启用离线 Repository Retrieval，并让单 Agent 修复失败的测试：
@@ -118,13 +118,13 @@ Autonomous Coding Dashboard 复用同一条确定性路径，并输出适合录�
 uv run python -m pix.coding_demo --print-json
 ```
 
-## Architecture
+## 🏗️ Architecture
 
 <p align="center">
   <img src="assets/pix-architecture.png" alt="PiX 架构：从 User Task，到 PiX Agent、Repository Retrieval、Tool Calling、Verification、Autonomous Repair、Git Commit，再到 Dashboard / Trace" width="1240">
 </p>
 
-## Agent Loop
+## 🔁 Agent Loop
 
 ```text
 while not finished:
@@ -141,7 +141,7 @@ while not finished:
 Loop 支持最大迭代次数、Provider 重试、Tool 超时、取消和安全错误恢复。验证
 失败时，固定轮次的修复循环会把真实失败输出交还给模型。
 
-## 主要能力
+## 🧩 主要能力
 
 - **Tool Registry**：本地工具与 MCP 工具统一实现 `Tool` 契约。
 - **文件系统沙箱**：防路径逃逸、UTF-8 优先、二进制检测、大小限制。
@@ -157,7 +157,7 @@ Loop 支持最大迭代次数、Provider 重试、Tool 超时、取消和安全�
 - **MCP**：stdio JSON-RPC Client、Tool Adapter、Registry。
 - **Evaluation**：JSON Benchmark 任务、验证规则与报告生成。
 
-## Tool System
+## 🔧 Tool System
 
 | Tool | 说明 |
 | --- | --- |
@@ -172,7 +172,7 @@ Loop 支持最大迭代次数、Provider 重试、Tool 超时、取消和安全�
 | `git_branch` | 当前分支与可用分支 |
 | `git_commit` | 暂存并以 message 提交 |
 
-## Context Engineering
+## 🧾 Context Engineering
 
 上下文按以下优先级组织：
 
@@ -185,7 +185,7 @@ Context Manager 估算 Token、执行预算并标记截断。当历史超出预�
 `ContextCompressor` 会先把旧消息压缩为紧凑事实，同时保留当前任务和最新工具
 状态。
 
-## Memory
+## 🧠 Memory
 
 - `ShortTermMemory`：当前 Session 的短期事实。
 - `LongTermMemory`：跨 Session 的 SQLite 持久化记忆。
@@ -195,7 +195,7 @@ Context Manager 估算 Token、执行预算并标记截断。当历史超出预�
 ChromaDB 与 Embedding Provider 是可选项（`uv sync --extra memory`）。未安装
 时会使用 SQLite 关键词检索，而不是假装已启用语义检索。
 
-## MCP
+## 🔌 MCP
 
 `StdioMCPClient` 通过 stdin/stdout 使用 JSON-RPC 通信。`MCPToolAdapter` 把远程
 工具包装为本地 `Tool`，`MCPRegistry` 以 `mcp__server__tool` 形式注册：
@@ -205,19 +205,19 @@ PIX_ENABLE_MCP=true
 PIX_MCP_SERVERS=["filesystem|npx -y @modelcontextprotocol/server-filesystem ./"]
 ```
 
-## Verification
+## 🧪 Verification
 
 Repository Analyzer 会从项目配置推断最可能的测试命令。Coding Run 结束后，
 Executor 会真实执行该命令并记录结果。失败输出会交给模型进行有上限的修复；
 不存在模拟成功状态。
 
-## Observability
+## 📡 Observability
 
 事件包括 Session 启动、Repository 分析、Plan 创建、Context 构建、LLM
 请求/响应、Tool 调用/结果、验证与错误。事件在持久化前统一脱敏。`Usage` 会在
 Provider 返回时记录输入/输出/总 Token；未知价格时不伪造成本。
 
-## Quick Start
+## 🚀 Quick Start
 
 要求：Python 3.11+、[uv](https://docs.astral.sh/uv/)、OpenAI API Key。
 
@@ -243,7 +243,7 @@ uv run pix trace <session-id>
 uv run pix run --workspace ./examples/demo-project "Fix the failing FizzBuzz test"
 ```
 
-## CLI
+## ⌨️ CLI
 
 ```bash
 uv run pix run "Fix the failing tests"
@@ -258,7 +258,7 @@ uv run pix serve
 
 CLI 使用 Rich Panel、状态颜色与表格输出。
 
-## Web Dashboard
+## 🖥️ Web Dashboard
 
 分别启动 API 与 Next.js：
 
@@ -274,7 +274,7 @@ Trace，包含 Agent Run、Autonomous Coding Demo、Sessions、Trace、Tools、
 Benchmark、Settings 视图。Demo 页面可以回放已生成的确定性快照，也可以从 UI
 重新运行脚本化 Demo。
 
-## Project Structure
+## 🗂️ Project Structure
 
 ```text
 pix/                  Python runtime
@@ -296,7 +296,7 @@ benchmarks/           JSON tasks and reports
 docs/                 architecture and design documents
 ```
 
-## Technical Deep Dive
+## 📚 Technical Deep Dive
 
 - [Architecture](docs/architecture.md)
 - [Agent Loop](docs/agent-loop.md)
@@ -308,7 +308,7 @@ docs/                 architecture and design documents
 - [Security](docs/security.md)
 - [Benchmark](docs/benchmark.md)
 
-## Development
+## 🛠️ Development
 
 ```bash
 uv sync --extra dev
@@ -321,7 +321,7 @@ uv run pytest
 全部测试使用标准 `pytest` 命令。集成测试使用本地脚本化 Provider，不需要
 网络或 API Key。
 
-## Docker
+## 🐳 Docker
 
 ```bash
 cp .env.example .env
@@ -331,7 +331,7 @@ docker compose up --build
 API 监听 `http://localhost:8000`，Dashboard 监听
 `http://localhost:3000`。
 
-## Benchmark
+## 📊 Benchmark
 
 Benchmark 任务定义是 `benchmarks/tasks` 下的 JSON 文件。v1.0 尚未随仓库提供
 已验证任务，因此在添加真实任务文件前，Runner 会报告暂无发布结果。结果只通过
@@ -345,7 +345,7 @@ uv run pix benchmark benchmarks/tasks
 报告写入 `benchmarks/results/`。在没有真实运行结果前，README 与 UI 会明确标注
 Benchmark 为实验性且未发布，而不是提供伪造数字。
 
-## Roadmap
+## 🗺️ Roadmap
 
 - 实现 Anthropic、Gemini、Ollama Provider
 - Planner / Coder / Tester / Reviewer 的 Multi-Agent 状态机
@@ -353,11 +353,11 @@ Benchmark 为实验性且未发布，而不是提供伪造数字。
 - 接入真实 CI，发布由 Actions 生成的测试与构建 Badge
 - 扩充经过验证的 Benchmark 任务仓库
 
-## Contributing
+## 🤝 Contributing
 
 保持核心 Runtime 不依赖 Agent 框架；每个边界都要有测试；README 与 docs 必须
 与代码同步。禁止提交伪造 Demo Trace 或 Benchmark 数字。
 
-## License
+## 📄 License
 
 [MIT](LICENSE)
