@@ -72,11 +72,11 @@ class GitDiffTool(Tool):
         if self._has_head():
             args = ["diff", "HEAD", "--no-color"]
             if path_filter:
-                args.append(path_filter)
+                args.extend(["--", path_filter])
             result = _run_git(args, self.cwd, self.timeout_seconds)
             stat_args = ["diff", "HEAD", "--stat", "--no-color"]
             if path_filter:
-                stat_args.append(path_filter)
+                stat_args.extend(["--", path_filter])
             stat = _run_git(stat_args, self.cwd, self.timeout_seconds)
             return {
                 "stat": stat["stdout"],

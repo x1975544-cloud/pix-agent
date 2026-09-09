@@ -38,3 +38,17 @@ def test_git_status_diff_and_commit(tmp_path):
     assert "feat: add app" in log.output["log"]
     branch = GitBranchTool(str(tmp_path)).execute({})
     assert branch.output["current"] in {"master", "main"}
+
+
+def test_git_diff_isolates_dash_prefixed_path(tmp_path):
+    _init_repo(tmp_path)
+    dash_file = tmp_path / "-changes.py"
+    dash_file.write_text("print('before')\n", encoding="utf-8", newline="")
+    subprocess.run(["git", "add", "--", "-changes.py"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=tmp_path, check=True, capture_output=True)
+    dash_file.write_text("print('after')\n", encoding="utf-8", newline="")
+
+    result = GitDiffTool(str(tmp_path)).execute({"path": "-changes.py"})
+
+    assert result.success
+    assert "print('after')" in result.output["diff"]
