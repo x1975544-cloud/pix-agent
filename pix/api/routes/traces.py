@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import queue
 
 from fastapi import APIRouter, HTTPException, Request
@@ -11,6 +12,8 @@ from fastapi.responses import StreamingResponse
 
 from pix.api.schemas import TraceEvent, TraceResponse
 from pix.errors import SessionNotFoundError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/traces", tags=["traces"])
 
@@ -29,7 +32,7 @@ async def stream_trace(request: Request, session_id: str) -> StreamingResponse:
     """Stream stored and live trace events for one session."""
 
     agent = request.app.state.agent
-    terminal_statuses = {"success", "failed", "cancelled"}
+    terminal_statuses = frozenset({"success", "failed", "cancelled"})
 
     async def events():
         try:
@@ -41,10 +44,14 @@ async def stream_trace(request: Request, session_id: str) -> StreamingResponse:
         bus = agent.executor.event_bus
         subscriber = bus.subscribe()
         try:
+            if await request.is_disconnected():
+                return
             seen_event_ids: set[str] = set()
             for event in agent.trace(session_id):
                 seen_event_ids.add(event["id"])
                 yield f"event: {event['type'].lower()}\ndata: {json.dumps(event, default=str)}\n\n"
+                if await request.is_disconnected():
+                    return
             while True:
                 if await request.is_disconnected():
                     return
@@ -60,12 +67,23 @@ async def stream_trace(request: Request, session_id: str) -> StreamingResponse:
                         live = await asyncio.to_thread(subscriber.get, timeout=0.25)
                     except queue.Empty:
                         continue
+                if await request.is_disconnected():
+                    return
                 if live.session_id != session_id or live.id in seen_event_ids:
                     continue
                 seen_event_ids.add(live.id)
                 yield f"event: {live.type.lower()}\ndata: {json.dumps(live.to_dict(), default=str)}\n\n"
                 if live.type in {"AGENT_FINISHED", "AGENT_ERROR"}:
                     return
+        except Exception as exc:  # noqa: BLE001 - keep the SSE channel alive
+            logger.exception("Live trace stream failed for session %s", session_id)
+            if not await request.is_disconnected():
+                error = {
+                    "session_id": session_id,
+                    "message": str(exc),
+                    "type": exc.__class__.__name__,
+                }
+                yield f"event: error\ndata: {json.dumps(error)}\n\n"
         finally:
             bus.unsubscribe(subscriber)
 

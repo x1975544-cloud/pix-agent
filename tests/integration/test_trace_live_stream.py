@@ -32,6 +32,17 @@ class DisconnectedRequest(FakeRequest):
         return True
 
 
+class DisconnectAfterFirstHistoryChunkRequest(FakeRequest):
+    """Disconnects as soon as one stored history event has been yielded."""
+
+    def __init__(self, agent: Agent) -> None:
+        super().__init__(agent)
+        self.chunks = 0
+
+    async def is_disconnected(self) -> bool:
+        return self.chunks > 0
+
+
 class GatedScriptedProvider(ScriptedProvider):
     """Scripted provider that pauses before the first planner request."""
 
@@ -146,4 +157,112 @@ def test_stream_unsubscribes_on_disconnect():
             pass
 
     asyncio.run(consume())
+    assert bus.subscriber_count == 0
+
+
+def test_event_bus_slow_subscriber_does_not_block_publisher():
+    bus = EventBus(max_queue_size=1)
+    slow_subscriber = bus.subscribe()
+
+    def publish_events() -> None:
+        for index in range(2000):
+            bus.publish("TOOL_CALL", {"index": index}, session_id="sess_slow")
+
+    publisher = threading.Thread(target=publish_events, name="event-bus-publisher", daemon=True)
+    publisher.start()
+    publisher.join(timeout=2)
+
+    assert not publisher.is_alive(), "A full subscriber must not block the agent event bus"
+    assert bus.subscriber_count == 1
+    assert slow_subscriber.qsize() == 1
+    assert slow_subscriber.get_nowait().payload == {"index": 1999}
+
+
+def test_event_bus_tolerates_concurrent_subscribe_publish_unsubscribe():
+    bus = EventBus(max_queue_size=16)
+    errors: list[BaseException] = []
+
+    def publish_events() -> None:
+        try:
+            for index in range(1000):
+                bus.publish("TOKEN", {"index": index}, session_id="sess_concurrent")
+        except BaseException as exc:  # noqa: BLE001 - kept for test diagnostics
+            errors.append(exc)
+
+    publisher = threading.Thread(target=publish_events, name="event-bus-concurrent", daemon=True)
+    publisher.start()
+    for _ in range(200):
+        subscriber = bus.subscribe()
+        bus.unsubscribe(subscriber)
+    publisher.join(timeout=2)
+
+    assert not publisher.is_alive()
+    assert not errors
+    assert bus.subscriber_count == 0
+
+
+def test_live_trace_stream_cleans_subscriber_when_consumer_is_cancelled():
+    bus = EventBus()
+    agent = SimpleNamespace(
+        executor=SimpleNamespace(event_bus=bus),
+        session=lambda _session_id: SimpleNamespace(status="pending"),
+        trace=lambda _session_id: [],
+    )
+
+    async def main() -> None:
+        response = await stream_trace(FakeRequest(agent), "sess_pending")
+        consumer = asyncio.create_task(response.body_iterator.__anext__())
+        await asyncio.sleep(0.35)
+        assert bus.subscriber_count == 1
+        consumer.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await consumer
+        assert bus.subscriber_count == 0
+
+    asyncio.run(main())
+
+
+def test_live_trace_stream_stops_replay_after_disconnect():
+    bus = EventBus()
+    history = [
+        {
+            "id": "history-1",
+            "type": "SESSION_STARTED",
+            "timestamp": "2026-09-09T00:00:00Z",
+            "payload": {},
+            "duration_ms": None,
+            "metadata": {},
+        },
+        {
+            "id": "history-2",
+            "type": "PLAN_CREATED",
+            "timestamp": "2026-09-09T00:00:01Z",
+            "payload": {},
+            "duration_ms": None,
+            "metadata": {},
+        },
+        {
+            "id": "history-3",
+            "type": "AGENT_FINISHED",
+            "timestamp": "2026-09-09T00:00:02Z",
+            "payload": {},
+            "duration_ms": None,
+            "metadata": {},
+        },
+    ]
+    agent = SimpleNamespace(
+        executor=SimpleNamespace(event_bus=bus),
+        session=lambda _session_id: SimpleNamespace(status="success"),
+        trace=lambda _session_id: history,
+    )
+    request = DisconnectAfterFirstHistoryChunkRequest(agent)
+
+    async def consume() -> None:
+        response = await stream_trace(request, "sess_history")
+        async for _chunk in response.body_iterator:
+            request.chunks += 1
+
+    asyncio.run(consume())
+
+    assert request.chunks == 1
     assert bus.subscriber_count == 0

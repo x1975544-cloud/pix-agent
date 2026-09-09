@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import queue
 import threading
@@ -105,9 +106,11 @@ async def run_agent_stream(request: Request, body: AgentRunRequest) -> Streaming
                 if await request.is_disconnected():
                     return
                 try:
-                    live = subscriber.get(timeout=0.1)
+                    live = await asyncio.to_thread(subscriber.get, timeout=0.1)
                 except queue.Empty:
                     continue
+                if await request.is_disconnected():
+                    return
                 if own_session_id is None:
                     if live.type != "SESSION_STARTED":
                         continue
