@@ -125,3 +125,11 @@ def test_parse_pytest_output():
     assert parsed["passed"] == 8
     assert parsed["failed"] == 2
     assert parsed["errors"] == 1
+
+
+def test_parse_result_counts_quiet_pytest_progress_when_summary_is_missing() -> None:
+    parsed = VerificationEngine.parse_result("...... [100%]\n\nsome warning text")
+
+    assert parsed["passed"] == 6
+    assert parsed["failed"] == 0
+    assert parsed["errors"] == 0

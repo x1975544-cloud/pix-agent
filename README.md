@@ -88,6 +88,13 @@ The automated integration test replays the same task with a scripted provider,
 so the retrieval -> modify -> test -> fix closure stays repeatable without
 spending model tokens.
 
+The Autonomous Coding Dashboard uses the same deterministic path and writes a
+GIF-friendly snapshot under `.demo/autonomous-coding-dashboard.json`:
+
+```bash
+uv run python -m pix.coding_demo --print-json
+```
+
 ## Architecture
 
 ```mermaid
@@ -273,8 +280,9 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. The dashboard reads live session and trace data
-from the FastAPI backend, with views for Agent Run, Sessions, Trace, Tools,
-Benchmark and Settings.
+from the FastAPI backend, with views for Agent Run, Autonomous Coding Demo,
+Sessions, Trace, Tools, Benchmark and Settings. The demo view can replay a
+persisted deterministic snapshot or start a fresh scripted run from the UI.
 
 ## Project Structure
 

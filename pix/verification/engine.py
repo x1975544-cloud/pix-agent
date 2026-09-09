@@ -122,11 +122,16 @@ class VerificationEngine:
             match = re.search(pattern, output, re.MULTILINE)
             return int(match.group(1)) if match else 0
 
-        return {
-            "passed": number(r"(?:^|\s)(\d+)\s+passed"),
-            "failed": number(r"(?:^|\s)(\d+)\s+failed"),
-            "errors": number(r"(?:^|\s)(\d+)\s+errors?\b"),
-        }
+        passed = number(r"(?:^|\s)(\d+)\s+passed")
+        failed = number(r"(?:^|\s)(\d+)\s+failed")
+        errors = number(r"(?:^|\s)(\d+)\s+errors?\b")
+        if passed == 0 and failed == 0 and errors == 0:
+            progress = "".join(re.findall(r"(?m)^([.FEsx]+)\s*(?:\[[^\]]*\]|\s*$)", output))
+            if progress:
+                passed = progress.count(".")
+                failed = progress.count("F")
+                errors = progress.count("E")
+        return {"passed": passed, "failed": failed, "errors": errors}
 
     @staticmethod
     def _summarize_pytest_failure(output: str) -> str:

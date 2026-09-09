@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  Bot,
   Braces,
   FlaskConical,
   Gauge,
@@ -16,6 +17,7 @@ import {
 const items = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/run", label: "Agent Run", icon: Play },
+  { href: "/autonomous-coding", label: "Coding Demo", icon: Bot },
   { href: "/sessions", label: "Sessions", icon: Activity },
   { href: "/tools", label: "Tools", icon: Braces },
   { href: "/benchmark", label: "Benchmark", icon: FlaskConical },

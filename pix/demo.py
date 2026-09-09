@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
+import stat
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -62,7 +64,7 @@ def prepare_demo_workspace(target: str | Path, *, source: str | Path | None = No
     if destination.exists():
         if not destination.is_dir():
             raise ValueError(f"Demo workspace path exists and is not a directory: {destination}")
-        shutil.rmtree(destination)
+        shutil.rmtree(destination, onerror=_clear_readonly)
     destination.mkdir(parents=True)
     shutil.copytree(source_dir, destination, dirs_exist_ok=True)
     _git(destination, "init", "-q")
@@ -83,6 +85,28 @@ def run_autonomous_demo(
     auto_fix_attempts: int = 2,
 ) -> DemoOutcome:
     """Run the demo against the existing single-agent runtime."""
+
+    outcome, _events = run_autonomous_demo_with_events(
+        workspace,
+        task=task,
+        provider=provider,
+        settings=settings,
+        database=database,
+        auto_fix_attempts=auto_fix_attempts,
+    )
+    return outcome
+
+
+def run_autonomous_demo_with_events(
+    workspace: str | Path,
+    *,
+    task: str = DEMO_TASK,
+    provider: LLMProvider | None = None,
+    settings: Settings | None = None,
+    database: str | Path | None = None,
+    auto_fix_attempts: int = 2,
+) -> tuple[DemoOutcome, list[dict[str, Any]]]:
+    """Run the demo and return both its report and raw trace timeline."""
 
     workspace_path = Path(workspace).expanduser().resolve()
     if not workspace_path.is_dir():
@@ -122,7 +146,7 @@ def run_autonomous_demo(
         verification_success=verification.success,
         verification_summary=result.state.summary or verification.summary(),
     )
-    return outcome
+    return outcome, events
 
 
 def format_outcome(outcome: DemoOutcome, *, json_output: bool = False) -> str:
@@ -213,6 +237,13 @@ def _git(workspace: Path, *arguments: str) -> None:
         capture_output=True,
         text=True,
     )
+
+
+def _clear_readonly(function: Any, path: str, _exc_info: object) -> None:
+    """Allow recursive cleanup to remove read-only files on Windows."""
+
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
 
 
 def _modified_files(events: list[dict[str, Any]], workspace: Path) -> list[str]:

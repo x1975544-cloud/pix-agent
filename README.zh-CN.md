@@ -83,6 +83,13 @@ uv run python -m pix.demo --prepare --json
 自动化集成测试使用脚本化 Provider 重放同一任务，因此
 检索 -> 修改 -> 测试 -> 修复 闭环可以在不消耗模型 token 的情况下重复验证。
 
+Autonomous Coding Dashboard 复用同一条确定性路径，并输出适合录制 GIF 的快照到
+`.demo/autonomous-coding-dashboard.json`：
+
+```bash
+uv run python -m pix.coding_demo --print-json
+```
+
 ## Architecture
 
 ```mermaid
@@ -253,7 +260,9 @@ npm run dev
 ```
 
 访问 `http://localhost:3000`。Dashboard 从 FastAPI 后端读取真实 Session 与
-Trace，包含 Agent Run、Sessions、Trace、Tools、Benchmark、Settings 视图。
+Trace，包含 Agent Run、Autonomous Coding Demo、Sessions、Trace、Tools、
+Benchmark、Settings 视图。Demo 页面可以回放已生成的确定性快照，也可以从 UI
+重新运行脚本化 Demo。
 
 ## Project Structure
 

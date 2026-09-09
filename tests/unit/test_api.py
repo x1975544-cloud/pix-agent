@@ -96,3 +96,22 @@ def test_api_rejects_missing_workspace_directory(tmp_path):
         )
         assert response.status_code == 400
         assert "does not exist" in response.json()["detail"]
+
+
+def test_coding_demo_routes_are_public_and_return_snapshots(tmp_path, monkeypatch):
+    application = create_app(_settings(tmp_path))
+    with TestClient(application) as client:
+        monkeypatch.setattr("pix.api.routes.coding_demo.load_coding_dashboard_snapshot", lambda: None)
+        assert client.get("/api/coding-demo").status_code == 404
+
+        fake_snapshot = {
+            "schema_version": 1,
+            "mode": "deterministic-scripted",
+            "task": "Fix FizzBuzz",
+            "phases": [],
+            "outcome": {"status": "success"},
+        }
+        monkeypatch.setattr("pix.api.routes.coding_demo.run_coding_dashboard", lambda: fake_snapshot)
+        response = client.post("/api/coding-demo/run")
+        assert response.status_code == 200
+        assert response.json() == fake_snapshot

@@ -4,84 +4,15 @@ import json
 from pathlib import Path
 
 import pytest
+from pix.coding_demo import build_coding_dashboard_snapshot, scripted_demo_provider
 from pix.config.settings import Settings
 from pix.demo import (
     DEMO_PROJECT_DIR,
     DEMO_TASK,
     format_outcome,
     prepare_demo_workspace,
-    run_autonomous_demo,
+    run_autonomous_demo_with_events,
 )
-from pix.providers.base import ChatMessage, ToolCall
-from tests.conftest import ScriptedProvider
-
-CORRECT_APP = """from fastapi import FastAPI
-
-app = FastAPI(title="Demo FastAPI")
-
-
-def fizzbuzz(number: int) -> str:
-    if number % 15 == 0:
-        return "FizzBuzz"
-    if number % 3 == 0:
-        return "Fizz"
-    if number % 5 == 0:
-        return "Buzz"
-    return str(number)
-
-
-@app.get("/")
-def root() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/fizzbuzz/{number}")
-def fizzbuzz_endpoint(number: int) -> dict[str, str]:
-    return {"value": fizzbuzz(number)}
-"""
-
-
-def _demo_provider() -> ScriptedProvider:
-    plan = {
-        "title": "Fix failing FizzBuzz test",
-        "summary": "Retrieve the FizzBuzz implementation, reproduce the failure, fix it, and rerun tests.",
-        "steps": [
-            {"title": "Retrieve", "description": "Search and read the FizzBuzz code."},
-            {"title": "Reproduce", "description": "Run the detected test command."},
-            {"title": "Fix", "description": "Correct the divisibility order and rerun tests."},
-        ],
-    }
-    return ScriptedProvider(
-        [
-            ChatMessage.assistant(json.dumps(plan)),
-            ChatMessage.assistant(
-                tool_calls=[ToolCall(id="call_search", name="search_code", arguments={"query": "fizzbuzz"})]
-            ),
-            ChatMessage.assistant(
-                tool_calls=[ToolCall(id="call_read", name="read_file", arguments={"path": "app.py"})]
-            ),
-            ChatMessage.assistant(
-                tool_calls=[
-                    ToolCall(
-                        id="call_tests",
-                        name="run_shell",
-                        arguments={"command": "uv run pytest -q"},
-                    )
-                ]
-            ),
-            ChatMessage.assistant("I reproduced the failing FizzBuzz tests."),
-            ChatMessage.assistant(
-                tool_calls=[
-                    ToolCall(
-                        id="call_write",
-                        name="write_file",
-                        arguments={"path": "app.py", "content": CORRECT_APP},
-                    )
-                ]
-            ),
-            ChatMessage.assistant("I fixed the divisibility order and the tests pass."),
-        ]
-    )
 
 
 @pytest.mark.integration
@@ -107,10 +38,10 @@ def test_autonomous_coding_demo_is_repeatable(tmp_path: Path) -> None:
             log_level="ERROR",
         )
 
-        outcome = run_autonomous_demo(
+        outcome, events = run_autonomous_demo_with_events(
             workspace,
             task=DEMO_TASK,
-            provider=_demo_provider(),
+            provider=scripted_demo_provider(),
             settings=settings,
         )
 
@@ -132,6 +63,24 @@ def test_autonomous_coding_demo_is_repeatable(tmp_path: Path) -> None:
         assert report["modified_files"] == ["app.py"]
         assert report["tests_passed"] >= 3
         assert report["tests_failed"] == 0
+
+        dashboard = build_coding_dashboard_snapshot(outcome, events)
+        assert dashboard["mode"] == "deterministic-scripted"
+        assert [phase["id"] for phase in dashboard["phases"]] == [
+            "task",
+            "repository-retrieval",
+            "tool-calls",
+            "test-failure",
+            "autonomous-repair",
+            "test-success",
+        ]
+        assert dashboard["changed_files"] == ["app.py"]
+        assert dashboard["verification"][0]["success"] is False
+        assert dashboard["verification"][-1]["success"] is True
+        assert dashboard["retrieval"]["count"] > 0
+        assert "app.py" in dashboard["retrieval"]["paths"]
+        assert any(call["name"] == "write_file" for call in dashboard["tool_calls"])
+        assert dashboard["timeline"]
 
         content = (workspace / "app.py").read_text(encoding="utf-8")
         assert content.index("if number % 15 == 0:") < content.index("if number % 3 == 0:")
