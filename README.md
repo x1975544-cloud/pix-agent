@@ -28,11 +28,19 @@ not a chat API wrapper.**
 > validation, SQLite, CLI, UI and packaging.
 
 <p align="center">
+  <img src="assets/pix-autonomous-coding-demo.gif" alt="PiX Autonomous Coding Demo replaying repository retrieval, test failure, autonomous repair and test success" width="1240">
+</p>
+
+<p align="center">
+  <strong>Autonomous Coding Demo:</strong> a deterministic replay of repository retrieval, failing test output, the repair loop and a passing rerun.
+</p>
+
+<p align="center">
   <img src="assets/pix-dashboard.png" alt="PiX Autonomous Coding Dashboard showing repository retrieval, tool calls, a failed test, autonomous repair and a passing rerun" width="1240">
 </p>
 
 <p align="center">
-  <strong>Dashboard Demo:</strong> run <code>bash scripts/coding-demo.sh</code>, then open <code>http://localhost:3000/autonomous-coding</code>.
+  <strong>Dashboard static overview:</strong> run <code>bash scripts/coding-demo.sh</code>, then open <code>http://localhost:3000/autonomous-coding</code>.
 </p>
 
 ---

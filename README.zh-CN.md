@@ -28,11 +28,19 @@
 > 打包使用成熟基础设施。
 
 <p align="center">
+  <img src="assets/pix-autonomous-coding-demo.gif" alt="PiX Autonomous Coding Demo 重放 Repository Retrieval、Test Failure、Autonomous Repair 与 Test Success" width="1240">
+</p>
+
+<p align="center">
+  <strong>Autonomous Coding Demo：</strong>确定性重放 Repository Retrieval、失败测试输出、Autonomous Repair 与最终测试通过。
+</p>
+
+<p align="center">
   <img src="assets/pix-dashboard.png" alt="PiX Autonomous Coding Dashboard 展示 Repository Retrieval、Tool Calling、Test Failure、Autonomous Repair 和 Test Success" width="1240">
 </p>
 
 <p align="center">
-  <strong>Dashboard Demo：</strong>运行 <code>bash scripts/coding-demo.sh</code>，然后在 Web Dashboard 打开 <code>http://localhost:3000/autonomous-coding</code>。
+  <strong>Dashboard 静态概览：</strong>运行 <code>bash scripts/coding-demo.sh</code>，然后在 Web Dashboard 打开 <code>http://localhost:3000/autonomous-coding</code>。
 </p>
 
 ---
