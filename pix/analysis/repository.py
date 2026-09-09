@@ -196,9 +196,9 @@ class RepositoryAnalyzer:
         if package_json.is_file():
             try:
                 data = json.loads(package_json.read_text(encoding="utf-8"))
-                test = data.get("scripts", {}).get("test")
-                if test:
-                    return f"npm test -- {test}" if str(test).startswith("next") else f"npm run test -- {test}"
+                scripts = data.get("scripts", {})
+                if scripts.get("test"):
+                    return "npm test"
             except (OSError, ValueError):
                 return None
             return "npm test"
