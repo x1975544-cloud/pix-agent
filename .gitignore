@@ -21,6 +21,8 @@ build/
 # Runtime data
 *.db
 *.sqlite3
+*.db-shm
+*.db-wal
 .pix/
 data/
 
@@ -28,6 +30,9 @@ data/
 node_modules/
 .next/
 out/
+web/next-env.d.ts
+web/AGENTS.md
+web/CLAUDE.md
 web/.env.local
 web/.env*.local
 npm-debug.log*
