@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import os
 import re
-import shlex
 import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from pix.errors import VerificationError
-from pix.security import redact_text
+from pix.process import run_workspace_process
+from pix.security import ShellPolicy, Workspace, redact_text
 
 
 @dataclass(slots=True)
@@ -41,6 +40,9 @@ class VerificationResult:
 class VerificationEngine:
     """Runs safe project commands and parses their success state."""
 
+    def __init__(self, *, policy: ShellPolicy | None = None) -> None:
+        self.policy = policy or ShellPolicy()
+
     def detect_project(self, workspace: Path) -> bool:
         return workspace.is_dir()
 
@@ -54,18 +56,15 @@ class VerificationEngine:
         return None
 
     def run_tests(self, workspace: Path, command: str, timeout: float = 120.0) -> VerificationResult:
-        tokens = shlex.split(command, posix=os.name != "nt")
-        if not tokens:
+        if not command.strip():
             raise VerificationError("Verification command is empty")
         started = time.perf_counter()
         try:
-            completed = subprocess.run(
-                tokens,
-                cwd=workspace,
-                capture_output=True,
-                text=True,
+            stdout, stderr, return_code = run_workspace_process(
+                command,
+                workspace=Workspace(workspace),
                 timeout=timeout,
-                check=False,
+                policy=self.policy,
             )
         except subprocess.TimeoutExpired:
             duration = time.perf_counter() - started
@@ -78,12 +77,12 @@ class VerificationEngine:
         except OSError as exc:
             raise VerificationError(f"Could not run verification command '{command}': {exc}") from exc
         duration = time.perf_counter() - started
-        stdout = redact_text(completed.stdout)
-        stderr = redact_text(completed.stderr)
+        stdout = redact_text(stdout)
+        stderr = redact_text(stderr)
         return VerificationResult(
             command=command,
-            success=completed.returncode == 0,
-            exit_code=completed.returncode,
+            success=return_code == 0,
+            exit_code=return_code,
             stdout=stdout[-30_000:],
             stderr=stderr[-10_000:],
             duration_seconds=duration,
