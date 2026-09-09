@@ -24,6 +24,18 @@ class ToolTimeoutError(ToolError):
     """Raised when a tool exceeds its configured timeout."""
 
 
+class SandboxError(PiXError):
+    """Raised when a process sandbox cannot execute a workspace command."""
+
+
+class SandboxUnavailableError(SandboxError):
+    """Raised when the sandbox runtime is missing or unreachable."""
+
+
+class SandboxTimeoutError(SandboxError):
+    """Raised when a sandboxed workspace process exceeds its timeout."""
+
+
 class ContextError(PiXError):
     """Raised when the context manager cannot build a valid prompt."""
 
