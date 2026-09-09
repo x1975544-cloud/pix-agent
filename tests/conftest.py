@@ -56,7 +56,13 @@ class ScriptedProvider(LLMProvider):
         message = self.responses.pop(0)
         if message.content:
             yield StreamEvent(kind="text_delta", text=message.content)
-        yield StreamEvent(kind="done")
+        yield StreamEvent(kind="done", message=message, usage=self.usage)
+
+    def count_tokens(self, text: str) -> int:
+        return max(1, len(text) // 4) if text else 0
+
+    def normalize_response(self, result: LLMResult) -> LLMResult:
+        return result
 
     def close(self) -> None:
         pass

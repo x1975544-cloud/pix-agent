@@ -9,6 +9,7 @@ from typing import Any
 from pix.persistence.models import TraceEventRecord
 from pix.persistence.repositories import TraceStore
 from pix.security import redact_payload
+from pix.tracing.bus import EventBus
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +24,13 @@ class Tracer:
         *,
         secret_values: Iterable[str] = (),
         events: list[TraceEventRecord] | None = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         self.store = store
         self.session_id = session_id
         self.secret_values = list(secret_values)
         self.events = events or []
+        self.event_bus = event_bus
 
     def emit(
         self,
@@ -48,6 +51,15 @@ class Tracer:
         )
         self.store.insert(record)
         self.events.append(record)
+        if self.event_bus is not None:
+            self.event_bus.publish(
+                event_type,
+                safe_payload,
+                session_id=self.session_id,
+                event_id=record.id,
+                duration_ms=duration_ms,
+                metadata=safe_metadata,
+            )
         return record
 
     def sink(self, event_type: str, payload: dict[str, Any]) -> None:

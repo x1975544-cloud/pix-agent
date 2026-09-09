@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal
+
+from pix.errors import ProviderError
 
 
 class Role(StrEnum):
@@ -98,6 +101,8 @@ class StreamEvent:
     tool_name: str | None = None
     arguments_delta: str = ""
     error: str | None = None
+    usage: Usage | None = None
+    message: ChatMessage | None = None
 
 
 class LLMProvider(ABC):
@@ -127,6 +132,14 @@ class LLMProvider(ABC):
         """Yield incremental text and tool-call deltas."""
 
     @abstractmethod
+    def count_tokens(self, text: str) -> int:
+        """Estimate token count without requiring a provider-specific SDK."""
+
+    @abstractmethod
+    def normalize_response(self, result: LLMResult) -> LLMResult:
+        """Normalize a backend-specific result into the shared contract."""
+
+    @abstractmethod
     def close(self) -> None:
         """Release any transport resources held by the provider."""
 
@@ -135,3 +148,54 @@ class LLMProvider(ABC):
 
     def __exit__(self, *_: object) -> None:
         self.close()
+
+
+def collect_stream(events: Iterator[StreamEvent]) -> LLMResult:
+    """Build a completed :class:`LLMResult` from an incremental event stream."""
+
+    text_parts: list[str] = []
+    tool_calls: dict[str, dict[str, object]] = {}
+    usage = Usage()
+    finish_reason = "stop"
+    final_message: ChatMessage | None = None
+
+    for event in events:
+        if event.kind == "error":
+            raise ProviderError(event.error or "Provider stream failed")
+        if event.kind == "text_delta" and event.text:
+            text_parts.append(event.text)
+        elif event.kind == "tool_call_delta":
+            call_id = event.tool_call_id or "call_0"
+            call = tool_calls.setdefault(call_id, {"id": call_id, "name": "", "arguments": ""})
+            if event.tool_name:
+                call["name"] = event.tool_name
+            call["arguments"] = str(call["arguments"]) + event.arguments_delta
+        elif event.kind == "done":
+            if event.usage is not None:
+                usage = event.usage
+            if event.message is not None:
+                final_message = event.message
+            break
+
+    if final_message is not None:
+        return LLMResult(message=final_message, usage=usage, finish_reason=finish_reason)
+
+    parsed_calls: list[ToolCall] = []
+    for raw_call in tool_calls.values():
+        arguments_text = str(raw_call.get("arguments") or "").strip() or "{}"
+        try:
+            arguments = json.loads(arguments_text)
+        except json.JSONDecodeError:
+            arguments = {"_raw": arguments_text}
+        parsed_calls.append(
+            ToolCall(
+                id=str(raw_call.get("id") or f"call_{len(parsed_calls)}"),
+                name=str(raw_call.get("name") or ""),
+                arguments=arguments,
+            )
+        )
+    return LLMResult(
+        message=ChatMessage.assistant(content="".join(text_parts), tool_calls=parsed_calls),
+        usage=usage,
+        finish_reason=finish_reason,
+    )

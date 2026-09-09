@@ -10,6 +10,7 @@ from pix.agent.state import AgentResult
 from pix.config.settings import Settings
 from pix.persistence.models import SessionRecord
 from pix.providers.base import LLMProvider
+from pix.tracing.bus import EventBus
 
 
 class Agent:
@@ -28,6 +29,8 @@ class Agent:
         max_iterations: int | None = None,
         auto_verify: bool = True,
         auto_fix_attempts: int = 2,
+        stream: bool = False,
+        event_bus: EventBus | None = None,
     ) -> AgentResult:
         return self.executor.execute(
             task,
@@ -36,6 +39,8 @@ class Agent:
             max_iterations=max_iterations,
             auto_verify=auto_verify,
             auto_fix_attempts=auto_fix_attempts,
+            stream=stream,
+            event_bus=event_bus,
         )
 
     def sessions(self, limit: int = 50) -> list[SessionRecord]:

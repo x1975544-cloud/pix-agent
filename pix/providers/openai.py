@@ -55,6 +55,20 @@ class OpenAIProvider(LLMProvider):
         if self._owns_client:
             self._client.close()
 
+    def count_tokens(self, text: str) -> int:
+        """Use the same conservative approximation as the context manager."""
+
+        if not text:
+            return 0
+        return max(1, len(text) // 4)
+
+    def normalize_response(self, result: LLMResult) -> LLMResult:
+        """Ensure a Responses result has the shared finish-reason vocabulary."""
+
+        if result.finish_reason not in {"stop", "length", "tool_calls", "content_filter", "error"}:
+            result.finish_reason = "stop"
+        return result
+
     def generate(
         self,
         messages: list[ChatMessage],
@@ -74,12 +88,14 @@ class OpenAIProvider(LLMProvider):
         payload = response.json()
         message, usage = self._parse_response(payload)
         latency = time.perf_counter() - started
-        return LLMResult(
+        return self.normalize_response(
+            LLMResult(
             message=message,
             usage=usage,
             finish_reason=str(payload.get("status", "completed")),
             latency_seconds=latency,
             raw={"id": payload.get("id"), "model": payload.get("model")},
+            )
         )
 
     def generate_stream(
@@ -90,7 +106,8 @@ class OpenAIProvider(LLMProvider):
         model: str | None = None,
     ) -> Iterator[StreamEvent]:
         body = self._build_request(messages, tools, model=model, stream=True)
-        current_tool: dict[str, Any] | None = None
+        tool_names: dict[str, str] = {}
+        final_usage: Usage | None = None
         try:
             with self._client.stream("POST", f"{self.api_base}/responses", json=body) as response:
                 if response.is_error:
@@ -110,19 +127,36 @@ class OpenAIProvider(LLMProvider):
                     if event_type == "response.output_text.delta":
                         yield StreamEvent(kind="text_delta", text=event.get("delta", ""))
                     elif event_type == "response.function_call_arguments.delta":
-                        arguments = event.get("delta", "")
-                        if current_tool is None:
-                            current_tool = {"call_id": event.get("item_id", ""), "arguments": ""}
-                        current_tool["arguments"] += arguments
-                        yield StreamEvent(kind="tool_call_delta", arguments_delta=arguments)
+                        item_id = str(event.get("item_id") or "")
+                        yield StreamEvent(
+                            kind="tool_call_delta",
+                            tool_call_id=item_id,
+                            arguments_delta=event.get("delta", ""),
+                        )
                     elif event_type == "response.function_call_arguments.done":
-                        if current_tool is None:
-                            current_tool = {"call_id": event.get("item_id", ""), "arguments": ""}
-                        current_tool["arguments"] = event.get("arguments", current_tool.get("arguments", ""))
+                        item_id = str(event.get("item_id") or "")
+                        tool_names[item_id] = str(event.get("name") or "")
+                        yield StreamEvent(
+                            kind="tool_call_delta",
+                            tool_call_id=item_id,
+                            tool_name=tool_names[item_id],
+                            arguments_delta="",
+                        )
+                    elif event_type == "response.completed":
+                        raw_usage = event.get("response", {}).get("usage") or {}
+                        final_usage = Usage(
+                            input_tokens=int(raw_usage.get("input_tokens") or 0),
+                            output_tokens=int(raw_usage.get("output_tokens") or 0),
+                            total_tokens=int(raw_usage.get("total_tokens") or 0),
+                            cached_input_tokens=int(
+                                raw_usage.get("input_tokens_details", {}).get("cached_tokens") or 0
+                            ),
+                            model=event.get("response", {}).get("model") or model or self.model,
+                        )
         except httpx.HTTPError as exc:
             yield StreamEvent(kind="error", error=str(exc))
             return
-        yield StreamEvent(kind="done")
+        yield StreamEvent(kind="done", usage=final_usage)
 
     def _build_request(
         self,

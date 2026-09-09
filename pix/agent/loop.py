@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
 
 from pix.agent.state import AgentState, AgentStatus, ToolObservation
 from pix.context.manager import ContextManager
 from pix.errors import AgentLoopError, ProviderError, ToolTimeoutError
-from pix.providers.base import ChatMessage, LLMProvider
+from pix.providers.base import ChatMessage, LLMProvider, LLMResult, StreamEvent, ToolCall, Usage
 from pix.tools.base import ToolResult
 from pix.tools.registry import ToolRegistry
 
@@ -29,6 +30,7 @@ class LoopOptions:
     tool_timeout: float = 60.0
     provider_retries: int = 2
     model: str | None = None
+    stream: bool = False
 
 
 class AgentLoop:
@@ -83,7 +85,10 @@ class AgentLoop:
                         "truncated": built.truncated,
                     },
                 )
-                result = self._generate(built.system_prompt, built.messages, state.iteration)
+                if self.options.stream:
+                    result = self._generate_stream(built.system_prompt, built.messages, state.iteration)
+                else:
+                    result = self._generate(built.system_prompt, built.messages, state.iteration)
                 assistant_message = result.message
                 state.add_message(assistant_message)
                 self.event_sink(
@@ -183,6 +188,80 @@ class AgentLoop:
                 time.sleep(delay)
         assert last_error is not None
         raise AgentLoopError(f"Provider request failed after {attempts} attempts: {last_error}")
+
+    def _generate_stream(self, system_prompt: str, messages: list[ChatMessage], iteration: int) -> LLMResult:
+        attempts = self.options.provider_retries + 1
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            if self.cancelled.is_set():
+                raise AgentLoopError("Cancelled")
+            try:
+                self.event_sink(
+                    "llm_request",
+                    {
+                        "iteration": iteration,
+                        "attempt": attempt + 1,
+                        "stream": True,
+                        "system_tokens": len(system_prompt) // 4,
+                        "messages": len(messages),
+                    },
+                )
+                return self._consume_stream(
+                    self.provider.generate_stream(
+                        [ChatMessage.system(system_prompt), *messages],
+                        self.registry.schemas(),
+                        model=self.options.model,
+                    )
+                )
+            except ProviderError as exc:
+                last_error = exc
+                delay = 0.5 * (2**attempt)
+                logger.warning("Streaming provider error on attempt %s, retrying in %ss: %s", attempt + 1, delay, exc)
+                time.sleep(delay)
+        assert last_error is not None
+        raise AgentLoopError(f"Provider stream failed after {attempts} attempts: {last_error}")
+
+    def _consume_stream(self, events: Iterator[StreamEvent]) -> LLMResult:
+        text_parts: list[str] = []
+        tool_calls: dict[str, dict[str, object]] = {}
+        usage = Usage()
+        final_message = None
+        for event in events:
+            if event.kind == "error":
+                raise ProviderError(event.error or "Provider stream failed")
+            if event.kind == "text_delta" and event.text:
+                text_parts.append(event.text)
+                self.event_sink("token", {"text": event.text})
+            elif event.kind == "tool_call_delta":
+                call_id = event.tool_call_id or "call_0"
+                call = tool_calls.setdefault(call_id, {"id": call_id, "name": "", "arguments": ""})
+                if event.tool_name:
+                    call["name"] = event.tool_name
+                call["arguments"] = str(call["arguments"]) + event.arguments_delta
+            elif event.kind == "done":
+                if event.usage is not None:
+                    usage = event.usage
+                if event.message is not None:
+                    final_message = event.message
+                break
+        if final_message is not None:
+            return LLMResult(message=final_message, usage=usage, finish_reason="stop")
+        parsed_calls: list[ToolCall] = []
+        for raw_call in tool_calls.values():
+            arguments_text = str(raw_call.get("arguments") or "").strip() or "{}"
+            try:
+                arguments = json.loads(arguments_text)
+            except json.JSONDecodeError:
+                arguments = {"_raw": arguments_text}
+            parsed_calls.append(
+                ToolCall(
+                    id=str(raw_call.get("id") or f"call_{len(parsed_calls)}"),
+                    name=str(raw_call.get("name") or ""),
+                    arguments=arguments,
+                )
+            )
+        message = ChatMessage.assistant(content="".join(text_parts), tool_calls=parsed_calls)
+        return LLMResult(message=message, usage=usage, finish_reason="stop")
 
     def _execute_tool(self, state: AgentState, call: Any) -> ToolObservation:
         name = call.name

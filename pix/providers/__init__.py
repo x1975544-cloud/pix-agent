@@ -7,6 +7,7 @@ from pix.providers.base import (
     StreamEvent,
     ToolCall,
     Usage,
+    collect_stream,
 )
 from pix.providers.factory import create_provider
 
@@ -17,5 +18,6 @@ __all__ = [
     "StreamEvent",
     "ToolCall",
     "Usage",
+    "collect_stream",
     "create_provider",
 ]

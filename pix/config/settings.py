@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     )
     model: str = Field(default="gpt-4o-mini", validation_alias="PIX_MODEL")
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="PIX_EMBEDDING_MODEL")
+    embedding_provider: str = Field(default="openai", validation_alias="PIX_EMBEDDING_PROVIDER")
+    vector_store_path: Path = Field(default=Path(".pix/vectors"), validation_alias="PIX_VECTOR_STORE_PATH")
+    chroma_collection: str = Field(default="pix_repository", validation_alias="PIX_CHROMA_COLLECTION")
+    enable_repository_index: bool = Field(default=False, validation_alias="PIX_ENABLE_REPOSITORY_INDEX")
 
     workspace: Path = Field(default=Path("."), validation_alias="PIX_WORKSPACE")
     max_iterations: int = Field(default=30, ge=1, le=200, validation_alias="PIX_MAX_ITERATIONS")
@@ -47,6 +51,12 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./pix-agent.db", validation_alias="PIX_DATABASE_URL")
     log_level: str = Field(default="INFO", validation_alias="PIX_LOG_LEVEL")
     auto_commit: bool = Field(default=False, validation_alias="PIX_AUTO_COMMIT")
+    max_verification_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        validation_alias="PIX_MAX_VERIFICATION_RETRIES",
+    )
 
     enable_mcp: bool = Field(default=False, validation_alias="PIX_ENABLE_MCP")
     mcp_servers: list[str] = Field(default_factory=list, validation_alias="PIX_MCP_SERVERS")
