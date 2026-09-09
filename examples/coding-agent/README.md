@@ -4,8 +4,11 @@ The coding agent workflow combines planning, tool execution, verification and
 Git:
 
 ```bash
-uv run pix run --workspace .demo/hello-fastapi "Add a health check endpoint"
+cd ../..
+bash scripts/demo.sh
 ```
 
-The same loop supports bug fixing, test generation and refactoring tasks. All
-changes are made through sandboxed tools inside the workspace.
+That command creates a disposable workspace from `examples/demo-project`, which
+contains an intentional FizzBuzz bug. The same single-agent loop performs
+repository retrieval, file edits, shell tests, automatic verification retries
+and final reporting.

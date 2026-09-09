@@ -45,14 +45,16 @@ while mature libraries handle HTTP, validation, SQLite, CLI, UI and packaging.
 
 ## Demo
 
-The repository includes a small FastAPI demo project. Create a disposable Git
-workspace and ask the agent to add a health endpoint:
+The repository includes a small FastAPI demo project with an intentional
+FizzBuzz bug. The demo creates a disposable Git workspace, enables offline
+repository retrieval, and asks the single agent to fix the failing tests:
 
 ```bash
 bash scripts/demo.sh
 ```
 
-The demo performs:
+The demo performs one complete autonomous coding loop and prints the modified
+files, final test result and trace ID:
 
 ```text
 Repository Analysis
@@ -61,18 +63,30 @@ Context Retrieval
     ↓
 Planning
     ↓
-Search / Read File
+Search / Read File / Shell
     ↓
 Write File
     ↓
-Run Tests
+Run Tests (expected to fail)
     ↓
 Verification
     ↓
-Git Diff
+Failure fed back for a fix loop
     ↓
-Git Commit
+Rerun Tests
+    ↓
+Report
 ```
+
+It is also available as a Python module:
+
+```bash
+uv run python -m pix.demo --prepare --json
+```
+
+The automated integration test replays the same task with a scripted provider,
+so the retrieval -> modify -> test -> fix closure stays repeatable without
+spending model tokens.
 
 ## Architecture
 
@@ -229,7 +243,7 @@ uv run pix trace <session-id>
 Run against another workspace:
 
 ```bash
-uv run pix run --workspace ./examples/demo-project "Add a health check endpoint"
+uv run pix run --workspace ./examples/demo-project "Fix the failing FizzBuzz test"
 ```
 
 ## CLI

@@ -42,14 +42,15 @@ HTTP、校验、SQLite、CLI、Web UI 与打包则使用成熟基础设施。
 
 ## Demo
 
-仓库内置一个小型 FastAPI Demo 工程。脚本会创建独立的 Git 工作区，并让 Agent
-添加健康检查端点：
+仓库内置一个小型 FastAPI Demo 工程，其中有一个故意的 FizzBuzz bug。脚本会创建
+独立的 Git 工作区、启用离线 Repository Retrieval，并让单 Agent 修复失败的测试：
 
 ```bash
 bash scripts/demo.sh
 ```
 
-Demo 真实执行流程：
+Demo 执行一个完整的 Autonomous Coding 闭环，并输出修改文件、最终测试结果和
+Trace ID：
 
 ```text
 Repository Analysis
@@ -58,18 +59,29 @@ Context Retrieval
     ↓
 Planning
     ↓
-Search / Read File
+Search / Read File / Shell
     ↓
 Write File
     ↓
-Run Tests
+Run Tests（预期失败）
     ↓
 Verification
     ↓
-Git Diff
+失败结果回传给修复循环
     ↓
-Git Commit
+Rerun Tests
+    ↓
+Report
 ```
+
+也可以直接使用 Python 模块运行：
+
+```bash
+uv run python -m pix.demo --prepare --json
+```
+
+自动化集成测试使用脚本化 Provider 重放同一任务，因此
+检索 -> 修改 -> 测试 -> 修复 闭环可以在不消耗模型 token 的情况下重复验证。
 
 ## Architecture
 
@@ -211,7 +223,7 @@ uv run pix trace <session-id>
 对指定 workspace 执行任务：
 
 ```bash
-uv run pix run --workspace ./examples/demo-project "Add a health check endpoint"
+uv run pix run --workspace ./examples/demo-project "Fix the failing FizzBuzz test"
 ```
 
 ## CLI
