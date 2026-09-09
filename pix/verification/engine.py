@@ -8,8 +8,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from pix.errors import VerificationError
+from pix.errors import SandboxError, SandboxTimeoutError, VerificationError
 from pix.process import run_workspace_process
+from pix.sandbox import Sandbox
 from pix.security import ShellPolicy, Workspace, redact_text
 
 
@@ -40,8 +41,14 @@ class VerificationResult:
 class VerificationEngine:
     """Runs safe project commands and parses their success state."""
 
-    def __init__(self, *, policy: ShellPolicy | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        policy: ShellPolicy | None = None,
+        sandbox: Sandbox | None = None,
+    ) -> None:
         self.policy = policy or ShellPolicy()
+        self.sandbox = sandbox
 
     def detect_project(self, workspace: Path) -> bool:
         return workspace.is_dir()
@@ -60,13 +67,23 @@ class VerificationEngine:
             raise VerificationError("Verification command is empty")
         started = time.perf_counter()
         try:
-            stdout, stderr, return_code = run_workspace_process(
-                command,
-                workspace=Workspace(workspace),
-                timeout=timeout,
-                policy=self.policy,
-            )
-        except subprocess.TimeoutExpired:
+            if self.sandbox is None:
+                stdout, stderr, return_code = run_workspace_process(
+                    command,
+                    workspace=Workspace(workspace),
+                    timeout=timeout,
+                    policy=self.policy,
+                )
+            else:
+                sandbox_result = self.sandbox.run(
+                    command,
+                    workspace=workspace,
+                    timeout=timeout,
+                )
+                stdout = sandbox_result.stdout
+                stderr = sandbox_result.stderr
+                return_code = sandbox_result.return_code
+        except (subprocess.TimeoutExpired, SandboxTimeoutError):
             duration = time.perf_counter() - started
             return VerificationResult(
                 command=command,
@@ -76,6 +93,8 @@ class VerificationEngine:
             )
         except OSError as exc:
             raise VerificationError(f"Could not run verification command '{command}': {exc}") from exc
+        except SandboxError as exc:
+            raise VerificationError(f"Could not run verification command '{command}' in sandbox: {exc}") from exc
         duration = time.perf_counter() - started
         stdout = redact_text(stdout)
         stderr = redact_text(stderr)

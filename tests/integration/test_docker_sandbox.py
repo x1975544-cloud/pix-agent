@@ -7,6 +7,7 @@ import subprocess
 import pytest
 from pix.errors import SandboxTimeoutError
 from pix.sandbox import DockerSandbox
+from pix.verification.engine import VerificationEngine
 
 pytestmark = [pytest.mark.integration]
 
@@ -110,3 +111,25 @@ def test_docker_sandbox_stops_timed_out_process(tmp_path):
             workspace=tmp_path,
             timeout=1,
         )
+
+
+@pytest.mark.skipif(not _docker_ready(), reason="Docker and the sandbox image are required")
+def test_verification_engine_runs_command_inside_docker_sandbox(tmp_path):
+    os.chmod(tmp_path, 0o777)
+    (tmp_path / "check.py").write_text(
+        "import os\n"
+        "import sys\n"
+        "if os.getuid() != 65534:\n"
+        "    sys.exit('verification escaped the sandbox')\n"
+        "print('verification ran in docker')\n",
+        encoding="utf-8",
+    )
+
+    result = VerificationEngine(sandbox=_make_sandbox()).run_tests(
+        tmp_path,
+        "python -B check.py",
+        timeout=30,
+    )
+
+    assert result.success
+    assert "verification ran in docker" in result.stdout
