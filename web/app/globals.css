@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ink text-slate-200 antialiased;
+}
+
+::selection {
+  @apply bg-signal/30 text-white;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-line;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
