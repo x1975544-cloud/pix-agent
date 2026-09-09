@@ -323,7 +323,9 @@ API 监听 `http://localhost:8000`，Dashboard 监听
 
 ## Benchmark
 
-Benchmark 任务位于 `benchmarks/tasks`。结果只通过真实运行生成：
+Benchmark 任务定义是 `benchmarks/tasks` 下的 JSON 文件。v1.0 尚未随仓库提供
+已验证任务，因此在添加真实任务文件前，Runner 会报告暂无发布结果。结果只通过
+真实运行生成：
 
 ```bash
 export OPENAI_API_KEY=...

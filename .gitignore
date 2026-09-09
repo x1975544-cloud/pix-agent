@@ -45,5 +45,5 @@ Thumbs.db
 
 # Demo workspaces and generated artifacts
 .demo/
-benchmarks/results/generated/
+benchmarks/results/
 benchmarks/runs/

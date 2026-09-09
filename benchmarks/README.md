@@ -1,7 +1,9 @@
 # Benchmark
 
 PiX benchmark tasks are JSON files under `tasks/`. Every task describes a real
-workspace, an expected behavior and machine-checkable validation rules.
+workspace, an expected behavior and machine-checkable validation rules. The
+directory is intentionally kept for task files; no verified tasks are shipped
+with v1.0 yet.
 
 Run them only when an OpenAI-compatible provider is configured:
 
