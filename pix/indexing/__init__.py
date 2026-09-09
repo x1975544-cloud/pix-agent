@@ -7,9 +7,16 @@ from pix.indexing.documents import (
     SearchResult,
 )
 from pix.indexing.indexer import RepositoryIndexer
-from pix.vectorstore import InMemoryVectorStore, MemoryVectorStore, VectorStore
+from pix.vectorstore import (
+    ChromaVectorStore,
+    InMemoryVectorStore,
+    MemoryVectorStore,
+    VectorStore,
+    create_vector_store,
+)
 
 __all__ = [
+    "ChromaVectorStore",
     "IndexedChunk",
     "InMemoryVectorStore",
     "MemoryVectorStore",
@@ -18,4 +25,5 @@ __all__ = [
     "RepositoryIndexer",
     "SearchResult",
     "VectorStore",
+    "create_vector_store",
 ]

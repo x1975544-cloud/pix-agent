@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,14 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_vector_store_type(cls, values: Any) -> Any:
+        if isinstance(values, dict) and "vector_store_type" in values and "vector_store" not in values:
+            values = dict(values)
+            values["vector_store"] = values.pop("vector_store_type")
+        return values
+
     api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     api_token: SecretStr | None = Field(default=None, validation_alias="PIX_API_TOKEN")
     api_base: str = Field(
@@ -35,9 +43,19 @@ class Settings(BaseSettings):
     model: str = Field(default="gpt-4o-mini", validation_alias="PIX_MODEL")
     embedding_model: str = Field(default="text-embedding-3-small", validation_alias="PIX_EMBEDDING_MODEL")
     embedding_provider: str = Field(default="openai", validation_alias="PIX_EMBEDDING_PROVIDER")
+    vector_store: Literal["memory", "chroma"] = Field(
+        default="memory",
+        validation_alias=AliasChoices("PIX_VECTOR_STORE", "PIX_VECTOR_STORE_TYPE"),
+    )
     vector_store_path: Path = Field(default=Path(".pix/vectors"), validation_alias="PIX_VECTOR_STORE_PATH")
     chroma_collection: str = Field(default="pix_repository", validation_alias="PIX_CHROMA_COLLECTION")
     enable_repository_index: bool = Field(default=False, validation_alias="PIX_ENABLE_REPOSITORY_INDEX")
+
+    @property
+    def vector_store_type(self) -> Literal["memory", "chroma"]:
+        """Compatibility alias for vector store configuration."""
+
+        return self.vector_store
 
     workspace: Path = Field(default=Path("."), validation_alias="PIX_WORKSPACE")
     max_iterations: int = Field(default=30, ge=1, le=200, validation_alias="PIX_MAX_ITERATIONS")
