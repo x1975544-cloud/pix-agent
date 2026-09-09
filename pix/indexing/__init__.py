@@ -7,6 +7,7 @@ from pix.indexing.documents import (
     SearchResult,
 )
 from pix.indexing.indexer import RepositoryIndexer
+from pix.indexing.retriever import RepositoryRetriever
 from pix.vectorstore import (
     ChromaVectorStore,
     InMemoryVectorStore,
@@ -23,6 +24,7 @@ __all__ = [
     "RepositoryDocument",
     "RepositoryIndexReport",
     "RepositoryIndexer",
+    "RepositoryRetriever",
     "SearchResult",
     "VectorStore",
     "create_vector_store",

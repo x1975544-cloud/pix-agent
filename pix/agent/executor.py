@@ -14,7 +14,9 @@ from pix.agent.state import AgentResult, AgentState, AgentStatus, Plan
 from pix.analysis.repository import RepositoryAnalyzer, RepositoryContext
 from pix.config.settings import Settings
 from pix.context.manager import ContextManager
+from pix.embedding import create_embedding_provider
 from pix.errors import SecurityError, SessionNotFoundError
+from pix.indexing import RepositoryIndexer, RepositoryRetriever
 from pix.mcp.client import StdioMCPClient
 from pix.mcp.registry import MCPRegistry
 from pix.memory.long_term import LongTermMemory
@@ -46,6 +48,7 @@ from pix.tracing.events import (
     VERIFICATION_STARTED,
 )
 from pix.tracing.tracer import Tracer
+from pix.vectorstore import create_vector_store
 from pix.verification.engine import VerificationEngine, VerificationResult
 
 logger = logging.getLogger(__name__)
@@ -61,6 +64,7 @@ class AgentExecutor:
         provider: LLMProvider | None = None,
         database: Database | None = None,
         event_bus: EventBus | None = None,
+        repository_retriever: RepositoryRetriever | None = None,
     ) -> None:
         self.settings = settings
         self._database = database or connect_database(settings.database_url)
@@ -70,6 +74,7 @@ class AgentExecutor:
         self._provider = provider
         self._owns_provider = provider is None
         self._event_bus = event_bus or EventBus()
+        self._repository_retriever = repository_retriever
 
     @property
     def event_bus(self) -> EventBus:
@@ -148,6 +153,7 @@ class AgentExecutor:
             planner = Planner(provider, model=model or self.settings.model)
             plan = planner.plan(task, repository)
             tracer.emit(PLAN_CREATED, plan.model_dump(mode="json"))
+            repository_hits = self._retrieve_repository_context(task, workspace_path, tracer)
 
             state = AgentState(
                 session_id=session_id,
@@ -187,6 +193,7 @@ class AgentExecutor:
                 tracer=tracer,
                 loop_options=loop_options,
                 memory_hits=[item.model_dump(mode="json") for item in memory_hits],
+                repository_hits=repository_hits,
                 verification=verification,
                 repository=repository,
                 auto_verify=auto_verify,
@@ -243,6 +250,7 @@ class AgentExecutor:
         tracer: Tracer,
         loop_options: LoopOptions,
         memory_hits: list[dict[str, Any]],
+        repository_hits: list[dict[str, Any]] | None = None,
         verification: VerificationEngine,
         repository: RepositoryContext,
         auto_verify: bool,
@@ -258,6 +266,7 @@ class AgentExecutor:
             tracer=tracer,
             loop_options=loop_options,
             memory_hits=memory_hits,
+            repository_hits=repository_hits or [],
         )
         attempts = 0
         while (
@@ -315,6 +324,7 @@ class AgentExecutor:
                 tracer=tracer,
                 loop_options=loop_options,
                 memory_hits=memory_hits,
+                repository_hits=repository_hits or [],
             )
         return state, verification_result
 
@@ -329,6 +339,7 @@ class AgentExecutor:
         tracer: Tracer,
         loop_options: LoopOptions,
         memory_hits: list[dict[str, Any]],
+        repository_hits: list[dict[str, Any]] | None = None,
     ) -> AgentState:
         state.status = AgentStatus.PENDING
         loop = AgentLoop(
@@ -339,6 +350,7 @@ class AgentExecutor:
             event_sink=tracer.sink,
             system_prompt=system_prompt,
             memory_hits=memory_hits,
+            repository_hits=repository_hits or [],
         )
         return loop.run(state)
 
@@ -385,6 +397,55 @@ class AgentExecutor:
         except (ImportError, Exception):  # noqa: BLE001
             self._memory_store.chroma = None
         return LongTermMemory(self._memory_store)
+
+    def _retrieve_repository_context(
+        self,
+        task: str,
+        workspace_path: Path,
+        tracer: Tracer,
+    ) -> list[dict[str, Any]]:
+        if not self.settings.enable_repository_index and self._repository_retriever is None:
+            return []
+        try:
+            retriever = self._repository_retriever or self._build_repository_retriever()
+            if retriever is None:
+                return []
+            hits = retriever.retrieve(task, workspace_path, top_k=self.settings.repository_top_k)
+        except Exception:  # noqa: BLE001 - repository retrieval is best effort
+            logger.warning("Repository semantic retrieval failed; continuing without code context", exc_info=True)
+            return []
+        tracer.emit(
+            "REPOSITORY_RETRIEVED",
+            {
+                "query": task,
+                "workspace": str(workspace_path),
+                "top_k": self.settings.repository_top_k,
+                "count": len(hits),
+                "paths": [hit.path for hit in hits],
+            },
+        )
+        return [hit.to_dict() for hit in hits]
+
+    def _build_repository_retriever(self) -> RepositoryRetriever | None:
+        if not self.settings.enable_repository_index:
+            return None
+        api_key = self.settings.api_key.get_secret_value() if self.settings.api_key else None
+        embedding = create_embedding_provider(
+            self.settings.embedding_provider,
+            api_key=api_key,
+            api_base=self.settings.api_base,
+            model=self.settings.embedding_model,
+        )
+        vector_store = create_vector_store(
+            self.settings.vector_store,
+            path=self.settings.vector_store_path,
+            collection_name=self.settings.chroma_collection,
+        )
+        indexer = RepositoryIndexer(
+            embedding=embedding,
+            vector_store=vector_store,
+        )
+        return RepositoryRetriever(indexer, top_k=self.settings.repository_top_k)
 
     def _system_prompt(self, repository: RepositoryContext, plan: Plan, skill_texts: list[str]) -> str:
         sections = [

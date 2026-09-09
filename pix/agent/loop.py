@@ -46,6 +46,8 @@ class AgentLoop:
         event_sink: EventSink | None = None,
         system_prompt: str | None = None,
         memory_hits: list[dict[str, Any]] | None = None,
+        repository_hits: list[Any] | None = None,
+        repository_retrieval: list[Any] | None = None,
     ) -> None:
         self.provider = provider
         self.registry = registry
@@ -54,6 +56,7 @@ class AgentLoop:
         self.event_sink = event_sink or (lambda _kind, _payload: None)
         self.system_prompt = system_prompt
         self.memory_hits = memory_hits or []
+        self.repository_hits = repository_hits or repository_retrieval or []
         self.cancelled = threading.Event()
 
     def cancel(self) -> None:
@@ -74,6 +77,7 @@ class AgentLoop:
                 built = self.context_manager.build(
                     state,
                     memory_hits=self.memory_hits,
+                    repository_hits=self.repository_hits,
                     system_prompt=self.system_prompt,
                 )
                 self.event_sink(

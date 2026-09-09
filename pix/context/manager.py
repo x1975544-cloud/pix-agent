@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,7 +10,7 @@ from pix.agent.state import AgentState
 from pix.analysis.repository import RepositoryContext
 from pix.context.builder import BuiltContext, ContextBuilder, ContextPriority, ContextSection
 from pix.context.compression import ContextCompressor
-from pix.context.window import estimate_tokens
+from pix.context.window import estimate_tokens, truncate_to_tokens
 
 
 @dataclass(slots=True)
@@ -23,6 +24,8 @@ class ContextManager:
         state: AgentState,
         *,
         repository_context: RepositoryContext | None = None,
+        repository_hits: list[Any] | None = None,
+        repository_retrieval: list[Any] | None = None,
         memory_hits: list[dict[str, Any]] | None = None,
         skill_texts: list[str] | None = None,
         system_prompt: str | None = None,
@@ -30,6 +33,7 @@ class ContextManager:
     ) -> BuiltContext:
         sections = self._build_sections(
             repository_context=repository_context,
+            repository_hits=repository_hits or repository_retrieval or [],
             memory_hits=memory_hits or [],
             skill_texts=skill_texts or [],
         )
@@ -73,6 +77,7 @@ class ContextManager:
         self,
         *,
         repository_context: RepositoryContext | None,
+        repository_hits: list[Any],
         memory_hits: list[dict[str, Any]],
         skill_texts: list[str],
     ) -> list[ContextSection]:
@@ -85,6 +90,17 @@ class ContextManager:
                     ContextPriority.RELEVANT_CODE,
                 )
             )
+        if repository_hits:
+            retrieval_text = self._format_repository_hits(repository_hits)
+            if retrieval_text:
+                retrieval_text = truncate_to_tokens(retrieval_text, max(1, self.budget_tokens // 2))
+                sections.append(
+                    ContextSection(
+                        "repository_retrieval",
+                        retrieval_text,
+                        ContextPriority.RELEVANT_CODE,
+                    )
+                )
         if skill_texts:
             sections.append(
                 ContextSection(
@@ -100,6 +116,30 @@ class ContextManager:
             if formatted:
                 sections.append(ContextSection("memory", f"Relevant memory:\n{formatted}", ContextPriority.MEMORY))
         return sections
+
+    @staticmethod
+    def _format_repository_hits(hits: list[Any]) -> str:
+        blocks: list[str] = []
+        for hit in hits:
+            if isinstance(hit, Mapping):
+                data = dict(hit)
+            elif hasattr(hit, "to_dict") and callable(hit.to_dict):
+                data = hit.to_dict()
+            else:
+                continue
+            content = str(data.get("content") or "")
+            if not content.strip():
+                continue
+            path = str(data.get("path") or data.get("chunk_id") or "repository")
+            start_line = int(data.get("start_line") or 1)
+            end_line = int(data.get("end_line") or start_line)
+            language = str(data.get("language") or "")
+            if not language.isalnum():
+                language = ""
+            blocks.append(f"### {path}:{start_line}-{end_line}\n```{language}\n{content.strip()}\n```")
+        if not blocks:
+            return ""
+        return "Repository retrieval context (semantic search):\n\n" + "\n\n".join(blocks)
 
 
 __all__ = [

@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     vector_store_path: Path = Field(default=Path(".pix/vectors"), validation_alias="PIX_VECTOR_STORE_PATH")
     chroma_collection: str = Field(default="pix_repository", validation_alias="PIX_CHROMA_COLLECTION")
     enable_repository_index: bool = Field(default=False, validation_alias="PIX_ENABLE_REPOSITORY_INDEX")
+    repository_top_k: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        validation_alias=AliasChoices(
+            "PIX_REPOSITORY_TOP_K",
+            "PIX_SEMANTIC_SEARCH_TOP_K",
+            "PIX_REPOSITORY_RETRIEVAL_TOP_K",
+        ),
+    )
 
     @property
     def vector_store_type(self) -> Literal["memory", "chroma"]:

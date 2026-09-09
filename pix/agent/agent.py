@@ -8,6 +8,7 @@ from typing import Any
 from pix.agent.executor import AgentExecutor
 from pix.agent.state import AgentResult
 from pix.config.settings import Settings
+from pix.indexing import RepositoryRetriever
 from pix.persistence.models import SessionRecord
 from pix.providers.base import LLMProvider
 from pix.tracing.bus import EventBus
@@ -16,9 +17,19 @@ from pix.tracing.bus import EventBus
 class Agent:
     """High-level agent entry point backed by :class:`AgentExecutor`."""
 
-    def __init__(self, settings: Settings, *, provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        provider: LLMProvider | None = None,
+        repository_retriever: RepositoryRetriever | None = None,
+    ) -> None:
         self.settings = settings
-        self.executor = AgentExecutor(settings, provider=provider)
+        self.executor = AgentExecutor(
+            settings,
+            provider=provider,
+            repository_retriever=repository_retriever,
+        )
 
     def run(
         self,
