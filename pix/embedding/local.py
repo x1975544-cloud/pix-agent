@@ -40,3 +40,12 @@ class HashingEmbeddingProvider(EmbeddingProvider):
         if norm:
             vector = [value / norm for value in vector]
         return vector
+
+
+class MockEmbeddingProvider(HashingEmbeddingProvider):
+    """Named mock embedding provider for deterministic offline tests."""
+
+    name = "mock"
+
+
+__all__ = ["HashingEmbeddingProvider", "MockEmbeddingProvider"]

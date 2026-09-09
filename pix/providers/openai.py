@@ -90,11 +90,11 @@ class OpenAIProvider(LLMProvider):
         latency = time.perf_counter() - started
         return self.normalize_response(
             LLMResult(
-            message=message,
-            usage=usage,
-            finish_reason=str(payload.get("status", "completed")),
-            latency_seconds=latency,
-            raw={"id": payload.get("id"), "model": payload.get("model")},
+                message=message,
+                usage=usage,
+                finish_reason=str(payload.get("status", "completed")),
+                latency_seconds=latency,
+                raw={"id": payload.get("id"), "model": payload.get("model")},
             )
         )
 

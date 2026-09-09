@@ -1,13 +1,13 @@
 """Embedding provider abstraction."""
 
 from pix.embedding.base import EmbeddingProvider
-from pix.embedding.local import HashingEmbeddingProvider
+from pix.embedding.local import HashingEmbeddingProvider, MockEmbeddingProvider
 from pix.embedding.openai import OpenAIEmbeddingProvider
 from pix.errors import ProviderError
 
 
 def create_embedding_provider(
-    name: str,
+    name: str = "local",
     *,
     api_key: str | None = None,
     api_base: str = "https://api.openai.com/v1",
@@ -15,8 +15,9 @@ def create_embedding_provider(
 ) -> EmbeddingProvider:
     """Create an embedding provider by name.
 
-    ``openai`` requires an API key. ``local`` always works and is intended for
-    offline Chroma integration and deterministic tests.
+    The default ``local`` provider requires no network or API key and is meant
+    for deterministic offline tests. ``openai`` requires an API key and is only
+    used when an explicit embedding backend is configured.
     """
 
     provider_name = name.lower()
@@ -29,11 +30,15 @@ def create_embedding_provider(
         return OpenAIEmbeddingProvider(api_key, api_base=api_base, model=model)
     if provider_name == "local":
         return HashingEmbeddingProvider()
+    if provider_name == "mock":
+        return MockEmbeddingProvider()
     raise ProviderError(f"Unknown embedding provider: {name}")
+
 
 __all__ = [
     "EmbeddingProvider",
     "HashingEmbeddingProvider",
+    "MockEmbeddingProvider",
     "OpenAIEmbeddingProvider",
     "create_embedding_provider",
 ]

@@ -11,7 +11,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pix.indexing.documents import IndexedChunk, RepositoryIndexReport
+from pix.embedding.base import EmbeddingProvider
+from pix.indexing.documents import IndexedChunk, RepositoryIndexReport, SearchResult
+from pix.vectorstore.base import VectorSearchResult, VectorStore
 
 SUPPORTED_SUFFIXES = {
     ".py": "python",
@@ -190,6 +192,13 @@ def _save_snapshot(index_path: Path, snapshot: dict[str, Any]) -> None:
             temp_path.unlink()
 
 
+def _metadata_int(metadata: dict[str, Any], key: str) -> int:
+    try:
+        return int(metadata[key])
+    except (KeyError, TypeError, ValueError):
+        return 1
+
+
 class RepositoryIndexer:
     """Scan source files and persist deterministic chunks as JSON.
 
@@ -205,6 +214,8 @@ class RepositoryIndexer:
         chunk_size: int = 1_000,
         chunk_overlap: int = 100,
         max_file_size: int = 500_000,
+        embedding: EmbeddingProvider | None = None,
+        vector_store: VectorStore | None = None,
     ) -> None:
         if chunk_size < 1:
             raise ValueError("chunk_size must be positive")
@@ -214,18 +225,102 @@ class RepositoryIndexer:
         self.chunk_size = chunk_size
         self.chunk_overlap = min(chunk_overlap, max(0, chunk_size - 1))
         self.max_file_size = max_file_size
+        self.embedding = embedding
+        self.vector_store = vector_store
 
     def index_repository(self, root: str | Path) -> list[IndexedChunk]:
         """Index or incrementally update a workspace and return all chunks."""
 
+        previous_ids = self._previous_chunk_ids(root)
         snapshot, _stats = self._update(root)
-        return _chunks_from_files(snapshot["files"])
+        chunks = _chunks_from_files(snapshot["files"])
+        self._sync_semantic_index(chunks, previous_ids)
+        return chunks
 
     def update_repository(self, root: str | Path) -> RepositoryIndexReport:
         """Run one incremental pass and return what changed."""
 
+        previous_ids = self._previous_chunk_ids(root)
         snapshot, stats = self._update(root)
+        chunks = _chunks_from_files(snapshot["files"])
+        self._sync_semantic_index(chunks, previous_ids)
         return self._build_report(root, snapshot, stats)
+
+    def search_repository(
+        self,
+        query: str,
+        *,
+        top_k: int = 10,
+        limit: int | None = None,
+    ) -> list[SearchResult]:
+        """Run top-K semantic search against the configured vector store."""
+
+        if self.embedding is None or self.vector_store is None:
+            raise ValueError("Semantic search requires embedding and vector_store")
+        if not query.strip():
+            raise ValueError("Search query cannot be empty")
+        vector = self.embedding.embed([query])[0]
+        matches = self.vector_store.query(vector, limit=limit if limit is not None else top_k)
+        return [self._search_result(match) for match in matches]
+
+    def _previous_chunk_ids(self, root: str | Path) -> set[str]:
+        if self.embedding is None or self.vector_store is None:
+            return set()
+        index_path = self._resolve_index_path(Path(root).expanduser().resolve())
+        previous = _load_snapshot(index_path)
+        return {
+            str(raw_chunk["id"])
+            for record in previous.get("files", {}).values()
+            for raw_chunk in record.get("chunks", [])
+        }
+
+    def _sync_semantic_index(
+        self,
+        chunks: list[IndexedChunk],
+        previous_ids: set[str],
+    ) -> None:
+        if self.embedding is None or self.vector_store is None:
+            return
+        current_ids = {chunk.id for chunk in chunks}
+        stale_ids = previous_ids - current_ids
+        if stale_ids:
+            self.vector_store.delete(list(stale_ids))
+        if chunks:
+            vectors = self.embedding.embed([chunk.content for chunk in chunks])
+            self.vector_store.upsert(
+                [chunk.id for chunk in chunks],
+                vectors,
+                [self._chunk_metadata(chunk) for chunk in chunks],
+            )
+
+    @staticmethod
+    def _chunk_metadata(chunk: IndexedChunk) -> dict[str, Any]:
+        metadata = dict(chunk.metadata)
+        metadata.update(
+            {
+                "path": chunk.document_path,
+                "chunk_id": chunk.id,
+                "content": chunk.content,
+                "language": chunk.language,
+                "start_line": chunk.start_line,
+                "end_line": chunk.end_line,
+            }
+        )
+        return metadata
+
+    @staticmethod
+    def _search_result(match: VectorSearchResult) -> SearchResult:
+        metadata = dict(match.metadata)
+        return SearchResult(
+            chunk_id=match.chunk_id,
+            path=match.path,
+            content=match.content,
+            score=match.score,
+            language=str(metadata.get("language", "unknown")),
+            start_line=_metadata_int(metadata, "start_line"),
+            end_line=_metadata_int(metadata, "end_line"),
+            metadata=metadata,
+        )
 
     def _update(self, root: str | Path) -> tuple[dict[str, Any], _UpdateStats]:
         root_path = Path(root).expanduser().resolve()

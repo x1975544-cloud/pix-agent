@@ -46,3 +46,33 @@ class RepositoryIndexReport:
     unchanged_files: int
     removed_files: int
     changed_chunks: int
+
+
+@dataclass(frozen=True, slots=True)
+class SearchResult:
+    """One repository chunk returned by semantic search."""
+
+    chunk_id: str
+    path: str
+    content: str
+    score: float
+    language: str = "unknown"
+    start_line: int = 1
+    end_line: int = 1
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def document_path(self) -> str:
+        return self.path
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "chunk_id": self.chunk_id,
+            "path": self.path,
+            "language": self.language,
+            "content": self.content,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "score": self.score,
+            "metadata": self.metadata,
+        }
