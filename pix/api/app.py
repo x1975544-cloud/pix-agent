@@ -6,10 +6,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from pix.agent.agent import Agent
+from pix.api.access import require_api_token
 from pix.api.routes import catalog, sessions, traces
 from pix.api.routes.agent import router as agent_router
 from pix.config.settings import Settings
@@ -41,9 +42,9 @@ def create_app(
     )
     application.state.settings = runtime_settings
     application.state.agent = runtime_agent
-    application.include_router(agent_router)
-    application.include_router(sessions.router)
-    application.include_router(traces.router)
+    protected_routers = [agent_router, sessions.router, traces.router]
+    for router in protected_routers:
+        application.include_router(router, dependencies=[Depends(require_api_token)])
     application.include_router(catalog.router)
 
     @application.get("/health")

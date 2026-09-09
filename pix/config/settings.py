@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     )
 
     api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    api_token: SecretStr | None = Field(default=None, validation_alias="PIX_API_TOKEN")
     api_base: str = Field(
         default="https://api.openai.com/v1",
         validation_alias=AliasChoices("PIX_API_BASE", "OPENAI_BASE_URL"),
@@ -58,6 +59,8 @@ class Settings(BaseSettings):
         values: list[str] = []
         if self.api_key:
             values.append(self.api_key.get_secret_value())
+        if self.api_token:
+            values.append(self.api_token.get_secret_value())
         return values
 
     def database_path(self) -> Path:

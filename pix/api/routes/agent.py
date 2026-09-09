@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 
 from pix.agent.agent import Agent
+from pix.api.access import resolve_api_workspace
 from pix.api.schemas import AgentRunRequest, AgentRunResponse
 from pix.errors import PiXError, SecurityError
 
@@ -17,10 +18,11 @@ def _agent(request: Request) -> Agent:
 
 @router.post("/run", response_model=AgentRunResponse)
 def run_agent(request: Request, body: AgentRunRequest) -> AgentRunResponse:
+    workspace = resolve_api_workspace(request.app.state.settings, body.workspace)
     try:
         result = _agent(request).run(
             body.task,
-            workspace=body.workspace,
+            workspace=workspace,
             model=body.model,
             max_iterations=body.max_iterations,
             auto_verify=body.auto_verify,
