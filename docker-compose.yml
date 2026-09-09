@@ -1,0 +1,29 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      PIX_WORKSPACE: /workspace
+      PIX_DATABASE_URL: sqlite:////app/data/pix-agent.db
+      PIX_SKILLS_DIR: /app/skills
+    volumes:
+      - .:/workspace
+      - pix-data:/app/data
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - api
+
+volumes:
+  pix-data:

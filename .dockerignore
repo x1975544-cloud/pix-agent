@@ -1,0 +1,14 @@
+.git
+.venv
+__pycache__
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.next
+node_modules
+.env
+*.db
+.demo
+web/node_modules
+web/.next
