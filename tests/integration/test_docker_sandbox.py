@@ -7,6 +7,8 @@ import subprocess
 import pytest
 from pix.errors import SandboxTimeoutError
 from pix.sandbox import DockerSandbox
+from pix.security import Workspace
+from pix.tools.shell import RunShellTool
 from pix.verification.engine import VerificationEngine
 
 pytestmark = [pytest.mark.integration]
@@ -133,3 +135,25 @@ def test_verification_engine_runs_command_inside_docker_sandbox(tmp_path):
 
     assert result.success
     assert "verification ran in docker" in result.stdout
+
+
+@pytest.mark.skipif(not _docker_ready(), reason="Docker and the sandbox image are required")
+def test_run_shell_tool_runs_command_inside_docker_sandbox(tmp_path):
+    os.chmod(tmp_path, 0o777)
+    (tmp_path / "probe.py").write_text(
+        "import os\n"
+        "import sys\n"
+        "if os.getuid() != 65534:\n"
+        "    sys.exit('shell escaped the sandbox')\n"
+        "print('shell ran in docker')\n",
+        encoding="utf-8",
+    )
+
+    result = RunShellTool(
+        Workspace(tmp_path),
+        timeout_seconds=30,
+        sandbox=_make_sandbox(),
+    ).execute({"command": "python -B probe.py"})
+
+    assert result.success
+    assert "shell ran in docker" in result.output["stdout"]
