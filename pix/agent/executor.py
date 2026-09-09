@@ -14,9 +14,7 @@ from pix.agent.state import AgentResult, AgentState, AgentStatus, Plan
 from pix.analysis.repository import RepositoryAnalyzer, RepositoryContext
 from pix.config.settings import Settings
 from pix.context.manager import ContextManager
-from pix.embedding import create_embedding_provider
 from pix.errors import SecurityError, SessionNotFoundError
-from pix.indexing.indexer import RepositoryIndexer
 from pix.mcp.client import StdioMCPClient
 from pix.mcp.registry import MCPRegistry
 from pix.memory.long_term import LongTermMemory
@@ -35,7 +33,6 @@ from pix.tools.filesystem import default_filesystem_tools
 from pix.tools.git import default_git_tools
 from pix.tools.registry import ToolRegistry
 from pix.tools.search import default_search_tool
-from pix.tools.semantic import SemanticSearchTool
 from pix.tools.shell import default_shell_tool
 from pix.tracing.bus import EventBus
 from pix.tracing.events import (
@@ -148,29 +145,6 @@ class AgentExecutor:
                 },
             )
 
-            repository_indexer: RepositoryIndexer | None = None
-            if self.settings.enable_repository_index:
-                embedding = create_embedding_provider(
-                    self.settings.embedding_provider,
-                    api_key=self.settings.api_key.get_secret_value() if self.settings.api_key else None,
-                    api_base=self.settings.api_base,
-                    model=self.settings.embedding_model,
-                )
-                repository_indexer = RepositoryIndexer(
-                    embedding,
-                    vector_store_path=self.settings.vector_store_path,
-                    collection_name=self.settings.chroma_collection,
-                )
-                indexed_chunks = repository_indexer.index_repository(workspace_path)
-                tracer.emit(
-                    "REPOSITORY_INDEXED",
-                    {
-                        "provider": embedding.name,
-                        "chunks": len(indexed_chunks),
-                        "collection": self.settings.chroma_collection,
-                    },
-                )
-
             planner = Planner(provider, model=model or self.settings.model)
             plan = planner.plan(task, repository)
             tracer.emit(PLAN_CREATED, plan.model_dump(mode="json"))
@@ -186,7 +160,7 @@ class AgentExecutor:
             )
             state.add_message(ChatMessage.user(task))
 
-            registry = self._build_tool_registry(sandbox, workspace_path, repository_indexer)
+            registry = self._build_tool_registry(sandbox, workspace_path)
             memory = self._build_memory()
             short_term = ShortTermMemory(session_id=session_id)
             memory_hits = memory.recall(task, limit=5)
@@ -372,7 +346,6 @@ class AgentExecutor:
         self,
         sandbox: Workspace,
         workspace_path: Path,
-        repository_indexer: RepositoryIndexer | None = None,
     ) -> ToolRegistry:
         tools: list[Tool] = [
             *default_filesystem_tools(sandbox, self.settings.max_file_bytes),
@@ -380,8 +353,6 @@ class AgentExecutor:
             default_search_tool(sandbox, self.settings.max_search_results, self.settings.max_file_bytes),
             *default_git_tools(str(workspace_path)),
         ]
-        if repository_indexer is not None:
-            tools.append(SemanticSearchTool(repository_indexer))
         registry = ToolRegistry(tools)
         if self.settings.enable_mcp:
             mcp_registry = MCPRegistry()

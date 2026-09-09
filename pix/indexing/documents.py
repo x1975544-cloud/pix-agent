@@ -1,4 +1,4 @@
-"""Document and chunk models used by the repository indexer."""
+"""Models shared by the repository indexer and its persistent snapshot."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class RepositoryDocument:
 
 @dataclass(slots=True)
 class IndexedChunk:
-    """A bounded chunk of a document, ready for embedding."""
+    """A bounded chunk of a source document with stable metadata."""
 
     id: str
     document_path: str
@@ -34,27 +34,15 @@ class IndexedChunk:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass(slots=True)
-class SearchResult:
-    """One semantic retrieval hit."""
+@dataclass(frozen=True, slots=True)
+class RepositoryIndexReport:
+    """Summary of one incremental indexing pass."""
 
-    chunk_id: str
-    document_path: str
-    language: str
-    content: str
-    start_line: int
-    end_line: int
-    score: float
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "chunk_id": self.chunk_id,
-            "path": self.document_path,
-            "language": self.language,
-            "content": self.content,
-            "start_line": self.start_line,
-            "end_line": self.end_line,
-            "score": self.score,
-            "metadata": self.metadata,
-        }
+    index_path: str
+    total_files: int
+    total_chunks: int
+    added_files: int
+    updated_files: int
+    unchanged_files: int
+    removed_files: int
+    changed_chunks: int
