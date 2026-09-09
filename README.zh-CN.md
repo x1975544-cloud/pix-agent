@@ -102,27 +102,9 @@ uv run python -m pix.coding_demo --print-json
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    User[User task] --> Session[Agent Session]
-    Session --> Analyzer[Repository Analyzer]
-    Session --> Planner[Planner]
-    Planner --> Loop[Agent Loop]
-    Loop --> Context[Context Manager]
-    Context --> LLM[LLM Provider]
-    LLM -->|tool calls| Registry[Tool Registry]
-    Registry --> Tools[File / Search / Shell / Git / MCP]
-    Tools --> Observation[Observation]
-    Observation --> Context
-    Context --> LLM
-    LLM -->|final answer| Verify{Verification}
-    Verify -->|failed| Loop
-    Verify -->|passed| Review[Git Diff Review]
-    Review --> Commit[Git Commit]
-    Loop --> Tracer[Trace / Token Usage]
-    Tracer --> SQLite[(SQLite)]
-    Session --> Memory[Memory Retrieval]
-```
+<p align="center">
+  <img src="assets/pix-architecture.png" alt="PiX 架构：从 User Task，到 PiX Agent、Repository Retrieval、Tool Calling、Verification、Autonomous Repair、Git Commit，再到 Dashboard / Trace" width="1240">
+</p>
 
 ## Agent Loop
 
