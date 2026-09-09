@@ -51,4 +51,44 @@ def test_shell_policy_rejects_destructive_commands():
 
 def test_shell_policy_accepts_project_commands():
     policy = ShellPolicy()
-    assert policy.validate("python -m pytest -q") == "python -m pytest -q"
+    for command in ("python -m pytest -q", "npm test -- --runInBand", "uv run pytest -q"):
+        assert policy.validate(command) == command
+
+
+def test_shell_policy_rejects_shell_wrappers():
+    policy = ShellPolicy()
+    for command in (
+        "sh -c 'cat /etc/passwd'",
+        "bash -c 'rm -rf /tmp/*'",
+        "cmd /c type C:\\outside.txt",
+        "powershell -Command Remove-Item -Recurse C:\\outside",
+        "env python -c 'import os; print(os.getcwd())'",
+    ):
+        with pytest.raises(SecurityError):
+            policy.validate(command)
+
+
+def test_shell_policy_rejects_inline_interpreter_code():
+    policy = ShellPolicy()
+    for command in (
+        "python -c \"open('/etc/passwd')\"",
+        "python3.13 -c \"open('/etc/passwd')\"",
+        "python3 -c 'import os; os.listdir(\"/\")'",
+        "node -e \"require('fs').readFileSync('/etc/passwd')\"",
+        'node --eval "process.cwd()"',
+        "ruby -e 'puts Dir.home'",
+        "php -r 'echo phpversion();'",
+    ):
+        with pytest.raises(SecurityError):
+            policy.validate(command)
+
+
+def test_workspace_rejects_command_path_outside(tmp_path):
+    workspace = Workspace(tmp_path)
+    with pytest.raises(SecurityError):
+        workspace.reject_external_paths(["python", "../outside.py"])
+
+
+def test_workspace_accepts_command_path_inside(tmp_path):
+    workspace = Workspace(tmp_path)
+    workspace.reject_external_paths(["python", "tests/test_demo.py"])

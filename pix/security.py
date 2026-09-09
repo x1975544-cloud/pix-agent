@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shlex
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
@@ -89,6 +91,22 @@ class Workspace:
         except SecurityError:
             return False
 
+    def reject_external_paths(self, arguments: Iterable[str]) -> None:
+        """Reject command arguments that point outside the workspace root."""
+
+        for argument in arguments:
+            path_text = _command_path_argument(argument)
+            if path_text is None:
+                continue
+            candidate = Path(path_text).expanduser()
+            if not candidate.is_absolute():
+                candidate = self.root / candidate
+            try:
+                resolved = candidate.resolve()
+                resolved.relative_to(self.root)
+            except ValueError as exc:
+                raise SecurityError(f"Command path escapes workspace root: {argument}") from exc
+
 
 DANGEROUS_PATTERNS = [
     re.compile(r"\brm\s+(-[A-Za-z]*[rRfF][A-Za-z]*\s+)+/+\s*$"),
@@ -106,6 +124,8 @@ DANGEROUS_PATTERNS = [
     re.compile(r"\bgit\s+filter-branch"),
     re.compile(r"\bgit\s+clean\s+-[A-Za-z]*[fF]"),
     re.compile(r"\bcurl\b.*\|\s*(?:ba)?sh\b"),
+    re.compile(r"\b(?:rd|rmdir)\s+(?:[/-]s\s*)?[/-]q"),
+    re.compile(r"\bRemove-Item\b|\bRemove-ChildItem\b"),
     re.compile(r"\s(?:&&|\|\||;)\s"),
     re.compile(r"\s(?:>|>>|<|<<)\s"),
 ]
@@ -115,14 +135,161 @@ FORBIDDEN_COMMANDS = {
     "reboot",
     "halt",
     "poweroff",
+    "del",
+    "deltree",
+    "erase",
+    "rd",
+    "rmdir",
     "mkfs",
     "mkfs.ext4",
     "mkfs.xfs",
 }
 
+_SHELL_WRAPPERS = {
+    "ash",
+    "bash",
+    "busybox",
+    "cmd",
+    "command.com",
+    "csh",
+    "dash",
+    "env",
+    "fish",
+    "ksh",
+    "powershell",
+    "pwsh",
+    "sh",
+    "sudo",
+    "tcsh",
+    "wsl",
+    "zsh",
+}
+
+_INLINE_EVAL_FLAGS = {
+    "bun": {"-e", "--eval"},
+    "deno": set(),
+    "node": {"-e", "--eval", "-p", "--print"},
+    "nodejs": {"-e", "--eval", "-p", "--print"},
+    "perl": {"-e"},
+    "php": {"-r"},
+    "py": {"-c"},
+    "python": {"-c"},
+    "python3": {"-c"},
+    "pythonw": {"-c"},
+    "ruby": {"-e"},
+}
+
+_STDIN_CODE_COMMANDS = {
+    "node",
+    "nodejs",
+    "perl",
+    "php",
+    "py",
+    "python",
+    "python3",
+    "pythonw",
+    "ruby",
+}
+
+_OPTIONS_WITH_VALUES = {
+    "node": {"--import", "--loader", "--require", "-r"},
+    "nodejs": {"--import", "--loader", "--require", "-r"},
+    "py": {"-W", "-X"},
+    "python": {"-W", "-X"},
+    "python3": {"-W", "-X"},
+    "pythonw": {"-W", "-X"},
+}
+
+_PATH_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
+_FILE_URI = re.compile(r"^file://", re.IGNORECASE)
+_PYTHON_EXECUTABLE = re.compile(r"^(?:py|python\d*(?:\.\d+)*|pythonw|pypy\d*(?:\.\d+)*)$")
+
+
+def _command_name(token: str) -> str:
+    """Return a normalized executable name from a command token."""
+
+    name = _strip_outer_quotes(token.strip()).lower()
+    name = re.split(r"[\\/]", name)[-1]
+    return name.removesuffix(".exe")
+
+
+def _strip_outer_quotes(value: str) -> str:
+    """Remove one layer of balanced quotes left by Windows shlex splitting."""
+
+    while len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+    return value
+
+
+def _command_path_argument(token: str) -> str | None:
+    """Return a path to validate when a token looks like a filesystem argument."""
+
+    value = _strip_outer_quotes(token.strip())
+    if not value:
+        return None
+
+    if value.startswith("-") and "=" in value:
+        _, _, value = value.partition("=")
+    elif value.startswith("@"):
+        value = value[1:]
+    if not value or value.startswith("-"):
+        return None
+    if value in {".", "--"}:
+        return None
+    if _FILE_URI.match(value):
+        return value[7:]
+    if value == ".." or value.startswith(("../", "./", "~/")):
+        return value
+    if value.startswith(("/", "\\")) or _PATH_DRIVE.match(value):
+        return value
+    if "/" in value or "\\" in value:
+        return value
+
+    try:
+        path = Path(value)
+        if path.is_symlink() or path.exists():
+            return value
+    except OSError:
+        return None
+    return None
+
+
+def _has_inline_code(exe_name: str, tokens: list[str]) -> bool:
+    """Detect interpreter flags such as ``python -c`` or ``node -e``."""
+
+    if exe_name == "deno" and len(tokens) > 1 and _strip_outer_quotes(tokens[1]) == "eval":
+        return True
+    eval_flags = _INLINE_EVAL_FLAGS.get(exe_name, set())
+    option_values = _OPTIONS_WITH_VALUES.get(exe_name, set())
+    stdin_code = exe_name in _STDIN_CODE_COMMANDS
+    if _PYTHON_EXECUTABLE.fullmatch(exe_name):
+        eval_flags = _INLINE_EVAL_FLAGS["python"]
+        option_values = _OPTIONS_WITH_VALUES["python"]
+        stdin_code = True
+    index = 1
+    while index < len(tokens):
+        option = _strip_outer_quotes(tokens[index])
+        if option in eval_flags:
+            return True
+        if "=" in option and option.partition("=")[0] in eval_flags:
+            return True
+        if any(option.startswith(flag) and flag.startswith("-") and not flag.startswith("--") for flag in eval_flags):
+            return True
+        if stdin_code and option == "-":
+            return True
+        if option == "-m" and exe_name in {"py", "python", "python3", "pythonw"}:
+            return False
+        if option in option_values:
+            index += 2
+            continue
+        if not option.startswith("-"):
+            return False
+        index += 1
+    return False
+
 
 class ShellPolicy:
-    """Decide whether a shell command may run inside an agent session."""
+    """Decide whether a process command may run inside an agent session."""
 
     def __init__(self, extra_deny_terms: Iterable[str] = ()) -> None:
         self.extra_deny_terms = frozenset(term.lower() for term in extra_deny_terms)
@@ -134,11 +301,18 @@ class ShellPolicy:
         if not stripped:
             raise SecurityError("Empty shell command")
         lower = stripped.lower()
-        first_word = stripped.split(maxsplit=1)[0].lower() if stripped else ""
-        if first_word in FORBIDDEN_COMMANDS or first_word in self.extra_deny_terms:
-            raise SecurityError(f"Command is forbidden by shell policy: {first_word}")
         if any(pattern.search(lower) for pattern in DANGEROUS_PATTERNS):
             raise SecurityError("Command matches a dangerous shell pattern")
+        tokens = shlex.split(stripped, posix=os.name != "nt")
+        if not tokens:
+            raise SecurityError("Empty shell command")
+        exe_name = _command_name(tokens[0])
+        if exe_name in FORBIDDEN_COMMANDS or exe_name in self.extra_deny_terms:
+            raise SecurityError(f"Command is forbidden by shell policy: {exe_name}")
+        if exe_name in _SHELL_WRAPPERS:
+            raise SecurityError(f"Command launches a shell wrapper: {exe_name}")
+        if _has_inline_code(exe_name, tokens):
+            raise SecurityError("Command uses inline code execution and is forbidden")
         return stripped
 
 
