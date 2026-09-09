@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+dist/
+build/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data
+*.db
+*.sqlite3
+.pix/
+data/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+web/.env.local
+web/.env*.local
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Demo workspaces and generated artifacts
+.demo/
+benchmarks/results/generated/
+benchmarks/runs/
