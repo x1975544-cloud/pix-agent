@@ -4,6 +4,10 @@
 
 **A Minimal, Extensible & Visual Autonomous Coding Agent Runtime**
 
+**PiX turns *"analyze this project and add JWT login"* into repository
+analysis, tool calls, code edits, tests, verification and a Git commit. It is
+not a chat API wrapper.**
+
 `Plan · Reason · Act · Observe · Verify · Commit`
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-306998?logo=python&logoColor=white)
@@ -15,19 +19,23 @@
 
 </div>
 
-![PiX Agent runtime architecture](assets/pix-hero.svg)
+| **Autonomous Coding** | **Repository Retrieval** | **Tool Calling** | **Test → Failure → Repair → Success** |
+| --- | --- | --- | --- |
+| Plans, calls tools, verifies failures and commits the repaired change in one bounded agent loop. | Indexes and searches the target repo before acting, so fixes start from real code rather than guesses. | Sandboxed read/write/search/shell/git tools with MCP extension points. | Runs the detected test command, feeds failed output back to the agent, then reruns until green. |
+
+> The agent loop, tool registry, context manager, memory and tracing are
+> implemented from scratch with typed Python. Mature libraries handle HTTP,
+> validation, SQLite, CLI, UI and packaging.
+
+<p align="center">
+  <img src="assets/pix-dashboard.png" alt="PiX Autonomous Coding Dashboard showing repository retrieval, tool calls, a failed test, autonomous repair and a passing rerun" width="1240">
+</p>
+
+<p align="center">
+  <strong>Dashboard Demo:</strong> run <code>bash scripts/coding-demo.sh</code>, then open <code>http://localhost:3000/autonomous-coding</code>.
+</p>
 
 ---
-
-## One Sentence
-
-PiX is a coding-agent runtime that turns a sentence such as *"analyze this
-project and add JWT login"* into repository analysis, tool calls, code edits,
-tests, verification and a Git commit.
-
-It is not a wrapper around a chat API. The agent loop, tool registry, context
-manager, memory and tracing are implemented from scratch with typed Python,
-while mature libraries handle HTTP, validation, SQLite, CLI, UI and packaging.
 
 ## Why PiX?
 

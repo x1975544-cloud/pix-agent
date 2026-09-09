@@ -1,10 +1,14 @@
+<div align="center">
+
 # ⚡ PiX Agent
 
 **A Minimal, Extensible & Visual Autonomous Coding Agent Runtime**
 
-一个从零实现的、可扩展、可观测、面向软件工程任务的 Coding Agent Runtime。
-
 `Plan · Reason · Act · Observe · Verify · Commit`
+
+**一个从零实现的、可扩展、可观测、面向软件工程任务的 Coding Agent Runtime。**
+
+**PiX 把“分析这个项目并帮我增加 JWT 登录”变成 Repository 分析、工具调用、代码修改、测试、验证和 Git Commit；它不是 chat API 包装器。**
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-306998?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
@@ -13,19 +17,25 @@
 ![Tests](https://img.shields.io/badge/tests-passing-34d399)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-![PiX Agent runtime architecture](assets/pix-hero.svg)
+</div>
+
+| **Autonomous Coding** | **Repository Retrieval** | **Tool Calling** | **Test → Failure → Repair → Success** |
+| --- | --- | --- | --- |
+| 在同一个有边界的 Agent Loop 中完成规划、工具调用、失败验证、修复并提交变更。 | 在执行前索引并检索目标仓库，让修复从真实代码出发，而不是靠猜测。 | 沙箱化的 read/write/search/shell/git 工具，并提供 MCP 扩展点。 | 执行检测到的测试命令，把失败输出回传给 Agent 修复，然后重跑直到通过。 |
+
+> Agent Loop、Tool Registry、Context Manager、Memory 和 Tracing 都由本项目从
+> 零实现，并使用带类型标注的 Python 编写；HTTP、校验、SQLite、CLI、Web UI 与
+> 打包使用成熟基础设施。
+
+<p align="center">
+  <img src="assets/pix-dashboard.png" alt="PiX Autonomous Coding Dashboard 展示 Repository Retrieval、Tool Calling、Test Failure、Autonomous Repair 和 Test Success" width="1240">
+</p>
+
+<p align="center">
+  <strong>Dashboard Demo：</strong>运行 <code>bash scripts/coding-demo.sh</code>，然后在 Web Dashboard 打开 <code>http://localhost:3000/autonomous-coding</code>。
+</p>
 
 ---
-
-## 一句话定位
-
-PiX 是一个 Coding Agent Runtime：输入“分析这个项目，并帮我增加 JWT 登录”，
-它会把这句话变成 Repository 分析、工具调用、代码修改、测试、验证和 Git
-Commit。
-
-它不是简单的 OpenAI API + Prompt + Chat。Agent Loop、Tool Registry、Context
-Manager、Memory、Trace 都由本项目自己实现，并使用带类型标注的 Python 编写；
-HTTP、校验、SQLite、CLI、Web UI 与打包则使用成熟基础设施。
 
 ## 为什么选择 PiX
 
